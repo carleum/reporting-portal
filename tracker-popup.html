@@ -101,8 +101,59 @@
   <div class="timer-block">
     <div class="timer-display" id="timerDisplay">00:00:00</div>
     <div class="timer-sub" id="timerSub">Waiting for screenshot paste</div>
-    <div class="btn-row">
-      <button class="btn btn-secondary" id="timerStartBtn" onclick="timerStartManual()" style="font-size:.72rem;">▶ Start Timer (Downtime)</button>
+
+    <!-- Downtime reason picker (shown after clicking Start Timer) -->
+    <div id="downtimeReasonWrap" style="display:none;margin-top:8px;">
+      <div style="font-size:.66rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Select downtime reason</div>
+      <select id="downtimeReason" class="exc-select" onchange="onDowntimeReasonPick()">
+        <option value="">— Pick a reason to start —</option>
+        <optgroup label="No Work">
+          <option>No Work - Expedite Auditor</option>
+          <option>No Work - Low volume</option>
+          <option>No Work - Retagging</option>
+          <option>No Work - System Issue</option>
+          <option>No Work - Transfer to another server</option>
+        </optgroup>
+        <optgroup label="Training / Development">
+          <option>Bootcamp</option>
+          <option>Calibration</option>
+          <option>Coaching</option>
+          <option>Dox Capture</option>
+          <option>E-Learning</option>
+          <option>FGD</option>
+          <option>Proficiency Assessment</option>
+          <option>Refresher TRN</option>
+          <option>Training</option>
+          <option>Work Mastery Exam</option>
+        </optgroup>
+        <optgroup label="MNL Low Volume">
+          <option>MNL Low Volume - Calibration</option>
+          <option>MNL Low Volume - Coaching</option>
+          <option>MNL Low Volume - E-Learning</option>
+          <option>MNL Low Volume - Experts Activities</option>
+          <option>MNL Low Volume - Huddle / FGD</option>
+          <option>MNL Low Volume - IT-Related Issue</option>
+          <option>MNL Low Volume - Management Initiated</option>
+          <option>MNL Low Volume - Refresher TRN</option>
+          <option>MNL Low Volume - WME</option>
+        </optgroup>
+        <optgroup label="Meetings / Activities">
+          <option>Annotation</option>
+          <option>Earthquake / Fire Drill</option>
+          <option>HMC Task</option>
+          <option>Huddle / Team Meeting</option>
+          <option>Lactation</option>
+          <option>Management Initiated</option>
+          <option>MNL Experts Activities</option>
+          <option>Office Clinic</option>
+          <option>OPI</option>
+          <option>RnR Activity</option>
+        </optgroup>
+      </select>
+    </div>
+
+    <div class="btn-row" style="margin-top:8px;">
+      <button class="btn btn-secondary" id="timerStartBtn" onclick="showDowntimeReasonPicker()" style="font-size:.72rem;">▶ Start Timer (Downtime)</button>
       <button class="btn btn-danger" id="timerResetBtn" onclick="timerReset()" style="display:none;">↺ Reset</button>
     </div>
   </div>
@@ -452,10 +503,29 @@ function timerStart() {
   saveState();
 }
 
-function timerStartManual() {
+function showDowntimeReasonPicker() {
+  const wrap = document.getElementById('downtimeReasonWrap');
+  wrap.style.display = '';
+  document.getElementById('downtimeReason').value = '';
+  document.getElementById('downtimeReason').focus();
+}
+
+function onDowntimeReasonPick() {
+  const reason = document.getElementById('downtimeReason').value;
+  if (!reason) return;
+  // Hide the picker and start the timer
+  document.getElementById('downtimeReasonWrap').style.display = 'none';
   timerStart();
-  document.getElementById('timerSub').textContent = '⏱ Downtime — timer running…';
-  showToast('⏱ Downtime timer started', '#E9730C');
+  document.getElementById('timerSub').textContent = '⏱ ' + reason;
+  // Pre-fill the exception panel with this reason so filing is one click
+  document.getElementById('excType').value = reason;
+  onExcTypeChange();
+  showToast('⏱ ' + reason, '#E9730C');
+}
+
+function timerStartManual() {
+  // kept for any legacy calls — routes through picker
+  showDowntimeReasonPicker();
 }
 
 function tickTimer() {
@@ -474,6 +544,7 @@ function timerReset() {
   document.getElementById('timerSub').textContent = 'Waiting for screenshot paste';
   document.getElementById('timerResetBtn').style.display = 'none';
   document.getElementById('timerStartBtn').style.display = '';
+  document.getElementById('downtimeReasonWrap').style.display = 'none';
   setLOB(lob, false);
   setServer(currentServer, false);
   clearFields();
