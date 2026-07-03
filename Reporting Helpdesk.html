@@ -1392,115 +1392,73 @@ td:has(.empty-state){text-align:center;}
 
 <!-- ACTIVITY TRACKER PAGE -->
 <div class="page" id="page-activity" style="padding:24px;overflow-y:auto;">
-  <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
     <div>
       <h2 style="font-size:.95rem;font-weight:700;margin-bottom:3px;">📊 Activity Tracker</h2>
-      <div style="font-size:.76rem;color:var(--muted);">Track your audit productivity. Pop out the tracker to use it alongside Concur.</div>
+      <div style="font-size:.76rem;color:var(--muted);">Your audit productivity dashboard. Use the tracker alongside Concur to log cases.</div>
     </div>
-    <div style="margin-left:auto;display:flex;gap:8px;">
-      <button class="btn-primary" style="padding:8px 18px;font-size:.8rem;" onclick="atPopOut()">⧉ Pop Out Tracker</button>
-    </div>
-  </div>
-
-  <!-- Inline tracker (shown when not popped out) -->
-  <div id="atInlineTracker">
-    <div style="display:grid;grid-template-columns:380px 1fr;gap:20px;">
-
-      <!-- Left: Entry Form (mirrors popup) -->
-      <div style="background:var(--card);border:1px solid rgba(27,144,255,0.25);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:10px;">
-
-        <!-- LOB -->
-        <div style="display:flex;gap:6px;">
-          <button class="queue-tab active" id="inLobIA" onclick="inSetLOB('IA')" style="flex:1;padding:6px;font-size:.76rem;">📊 IA — Expense</button>
-          <button class="queue-tab" id="inLobIC" onclick="inSetLOB('IC')" style="flex:1;padding:6px;font-size:.76rem;">🧾 IC — Invoice</button>
-        </div>
-
-        <!-- Paste Zone -->
-        <div id="inPasteZone" style="border:2px dashed rgba(27,144,255,0.4);border-radius:8px;padding:14px;text-align:center;cursor:pointer;background:rgba(0,112,242,0.04);transition:all .2s;" tabindex="0">
-          <div style="font-size:.74rem;color:var(--muted);pointer-events:none;">📋 <b>Ctrl+V</b> to paste Concur screenshot<br><span style="font-size:.68rem;">Timer starts automatically on paste</span></div>
-          <img id="inPastePreview" style="max-width:100%;max-height:60px;border-radius:4px;margin-top:6px;display:none;" />
-          <div id="inOcrStatus" style="font-size:.68rem;margin-top:4px;display:none;"></div>
-        </div>
-
-        <!-- Timer -->
-        <div style="background:rgba(0,0,0,.2);border:1px solid rgba(27,144,255,0.2);border-radius:8px;padding:10px;text-align:center;">
-          <div id="inTimerDisplay" style="font-size:1.6rem;font-weight:700;color:var(--accent2);letter-spacing:2px;font-variant-numeric:tabular-nums;">00:00:00</div>
-          <div id="inTimerStatus" style="font-size:.68rem;color:var(--muted);margin-top:2px;">Waiting for screenshot paste</div>
-          <button class="btn-secondary" id="inTimerResetBtn" onclick="inTimerReset()" style="display:none;width:100%;margin-top:6px;padding:5px;font-size:.72rem;">↺ Reset</button>
-        </div>
-
-        <!-- Fields -->
-        <div>
-          <div style="font-size:.66rem;color:var(--muted);margin-bottom:3px;" id="inIdLabel">REPORT ID</div>
-          <input class="form-inp" id="inFieldId" type="text" placeholder="Auto-filled from screenshot" style="font-size:.8rem;padding:7px 10px;" />
-        </div>
-        <div id="inEntityWrap">
-          <div style="font-size:.66rem;color:var(--muted);margin-bottom:3px;">ENTITY CODE</div>
-          <input class="form-inp" id="inFieldEntity" type="text" placeholder="Auto-filled from screenshot" style="font-size:.8rem;padding:7px 10px;" />
-        </div>
-        <div>
-          <div style="font-size:.66rem;color:var(--muted);margin-bottom:3px;" id="inQLabel">QUESTION COUNT</div>
-          <input class="form-inp" id="inFieldQ" type="number" placeholder="Auto-filled from screenshot" min="0" style="font-size:.8rem;padding:7px 10px;" />
-        </div>
-        <div>
-          <div style="font-size:.66rem;color:var(--muted);margin-bottom:3px;">COMPANY / CLIENT</div>
-          <input class="form-inp" id="inFieldCompany" type="text" placeholder="Auto-filled from screenshot" style="font-size:.8rem;padding:7px 10px;" />
-        </div>
-
-        <!-- Save buttons -->
-        <div style="display:flex;gap:6px;">
-          <button class="btn-primary" onclick="inSaveEntry(true)" style="flex:1;padding:8px;font-size:.76rem;background:#188918;">✓ Save &amp; Next</button>
-          <button class="btn-secondary" onclick="inSaveEntry(false)" style="flex:1;padding:8px;font-size:.76rem;">✓ Save &amp; Done</button>
-        </div>
-        <button onclick="inShowEscalate()" style="width:100%;padding:7px;background:rgba(255,80,80,0.12);border:1px solid rgba(255,80,80,0.3);color:#FF9999;border-radius:6px;font-size:.74rem;font-weight:700;cursor:pointer;">⚠ Quit / Escalate</button>
-
-        <!-- Escalation Panel -->
-        <div id="inEscalatePanel" style="display:none;background:rgba(233,115,12,0.08);border:1px solid rgba(233,115,12,0.35);border-radius:8px;padding:12px;">
-          <div style="font-weight:700;font-size:.78rem;color:#FFB57A;margin-bottom:8px;">⚠ Task Workflow — Escalation</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-bottom:8px;">
-            ${['Chinese','Japanese','Korean','German','Portuguese/Spanish','Portuguese','Spanish','French','Thai','Vietnamese','Arabic','Invoice','Tax Question','Client Services'].map(r=>`<label style="display:flex;align-items:center;gap:5px;font-size:.73rem;cursor:pointer;padding:2px 0;"><input type="radio" name="inEscReason" value="${r}" style="accent-color:#E9730C;" />${r}</label>`).join('')}
-          </div>
-          <textarea id="inEscNotes" rows="2" class="form-inp" placeholder="Optional notes…" style="font-size:.76rem;resize:none;margin-bottom:8px;"></textarea>
-          <div style="display:flex;gap:6px;">
-            <button class="btn-secondary" onclick="inHideEscalate()" style="flex:1;font-size:.72rem;padding:6px;">← Back</button>
-            <button onclick="inQuitTask()" style="flex:1;padding:6px;background:rgba(255,80,80,0.12);border:1px solid rgba(255,80,80,0.3);color:#FF9999;border-radius:6px;font-size:.72rem;font-weight:700;cursor:pointer;">Quit Task</button>
-            <button onclick="inEscalateTask()" style="flex:1;padding:6px;background:rgba(233,115,12,0.2);border:1px solid rgba(233,115,12,0.5);color:#FFB57A;border-radius:6px;font-size:.72rem;font-weight:700;cursor:pointer;">⚠ Escalate</button>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- Right: Today's Stats -->
-      <div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;">
-          <div style="background:var(--card);border:1px solid rgba(27,144,255,0.2);border-radius:10px;padding:14px;text-align:center;">
-            <div style="font-size:1.6rem;font-weight:700;color:var(--accent2);" id="inMCases">0</div>
-            <div style="font-size:.68rem;color:var(--muted);margin-top:3px;" id="inMCasesLbl">Reports Today</div>
-          </div>
-          <div style="background:var(--card);border:1px solid rgba(27,144,255,0.2);border-radius:10px;padding:14px;text-align:center;">
-            <div style="font-size:1.6rem;font-weight:700;color:var(--accent2);" id="inMQPH">—</div>
-            <div style="font-size:.68rem;color:var(--muted);margin-top:3px;" id="inMQPHLbl">QPH</div>
-          </div>
-          <div style="background:var(--card);border:1px solid rgba(27,144,255,0.2);border-radius:10px;padding:14px;text-align:center;">
-            <div style="font-size:1.6rem;font-weight:700;color:var(--accent2);" id="inMUtil">—</div>
-            <div style="font-size:.68rem;color:var(--muted);margin-top:3px;">Utilization</div>
-          </div>
-        </div>
-        <div style="background:var(--card);border:1px solid rgba(27,144,255,0.2);border-radius:10px;padding:16px;">
-          <div style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;">Today's Log</div>
-          <div id="inCaseLog" style="font-size:.78rem;color:var(--muted);">No entries yet.</div>
-        </div>
-      </div>
-
+    <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+      <div id="atTrackerBadge" style="display:none;font-size:.72rem;padding:4px 10px;background:rgba(24,137,24,0.15);border:1px solid rgba(24,137,24,0.4);color:#7ED47E;border-radius:20px;">🟢 Tracker Active</div>
+      <button id="atLaunchBtn" class="btn-primary" style="padding:8px 18px;font-size:.8rem;" onclick="atLaunch()">🚀 Launch Tracker</button>
     </div>
   </div>
 
-  <!-- Popped out message -->
-  <div id="atPoppedMsg" style="display:none;text-align:center;padding:40px;">
-    <div style="font-size:2rem;margin-bottom:12px;">⧉</div>
-    <div style="font-weight:700;margin-bottom:6px;">Tracker is popped out</div>
-    <div style="font-size:.8rem;color:var(--muted);margin-bottom:16px;">Use the floating window alongside Concur. Click below to bring it back.</div>
-    <button class="btn-primary" style="padding:8px 20px;" onclick="atDockBack()">↩ Dock Back</button>
+  <!-- Date toggle -->
+  <div style="display:flex;gap:6px;margin-bottom:16px;">
+    <button id="atDashBtnToday" style="background:rgba(0,112,242,0.2);border:1px solid var(--accent);color:var(--text);border-radius:6px;padding:5px 16px;font-size:.78rem;font-weight:700;cursor:default;">Today</button>
+  </div>
+
+  <!-- Metrics — separate IA and IC rows -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+    <!-- IA -->
+    <div style="background:rgba(0,112,242,0.06);border:1px solid rgba(27,144,255,0.2);border-radius:10px;padding:14px;">
+      <div style="font-size:.68rem;font-weight:700;color:var(--accent2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;">📊 IA — Expense Audit</div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;">
+        <div style="text-align:center;"><div style="font-size:1.3rem;font-weight:700;color:var(--accent2);" id="atDMIA_cases">—</div><div style="font-size:.62rem;color:var(--muted);margin-top:2px;">Reports</div></div>
+        <div style="text-align:center;"><div style="font-size:1.3rem;font-weight:700;color:var(--accent2);" id="atDMIA_q">—</div><div style="font-size:.62rem;color:var(--muted);margin-top:2px;">Questions</div></div>
+        <div style="text-align:center;"><div style="font-size:1.3rem;font-weight:700;color:var(--accent2);" id="atDMIA_hrs">—</div><div style="font-size:.62rem;color:var(--muted);margin-top:2px;">Prod. Hrs</div></div>
+        <div style="text-align:center;"><div style="font-size:1.3rem;font-weight:700;color:var(--accent2);" id="atDMIA_qph">—</div><div style="font-size:.62rem;color:var(--muted);margin-top:2px;">QPH</div></div>
+        <div style="text-align:center;"><div style="font-size:1.3rem;font-weight:700;color:var(--accent2);" id="atDMIA_util">—</div><div style="font-size:.62rem;color:var(--muted);margin-top:2px;">Util%</div></div>
+      </div>
+    </div>
+    <!-- IC -->
+    <div style="background:rgba(0,112,242,0.06);border:1px solid rgba(27,144,255,0.2);border-radius:10px;padding:14px;">
+      <div style="font-size:.68rem;font-weight:700;color:var(--accent2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;">🧾 IC — Invoice Capture</div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;">
+        <div style="text-align:center;"><div style="font-size:1.3rem;font-weight:700;color:var(--accent2);" id="atDMIC_cases">—</div><div style="font-size:.62rem;color:var(--muted);margin-top:2px;">Batches</div></div>
+        <div style="text-align:center;"><div style="font-size:1.3rem;font-weight:700;color:var(--accent2);" id="atDMIC_q">—</div><div style="font-size:.62rem;color:var(--muted);margin-top:2px;">Invoices</div></div>
+        <div style="text-align:center;"><div style="font-size:1.3rem;font-weight:700;color:var(--accent2);" id="atDMIC_hrs">—</div><div style="font-size:.62rem;color:var(--muted);margin-top:2px;">Prod. Hrs</div></div>
+        <div style="text-align:center;"><div style="font-size:1.3rem;font-weight:700;color:var(--accent2);" id="atDMIC_qph">—</div><div style="font-size:.62rem;color:var(--muted);margin-top:2px;">IPH</div></div>
+        <div style="text-align:center;"><div style="font-size:1.3rem;font-weight:700;color:var(--accent2);" id="atDMIC_util">—</div><div style="font-size:.62rem;color:var(--muted);margin-top:2px;">Util%</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Productivity Log -->
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+    <div style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;">Productivity Log</div>
+    <div id="atViewingBadge" style="display:none;background:rgba(0,112,242,0.15);border:1px solid var(--accent);color:var(--accent2);border-radius:20px;padding:3px 10px;font-size:.72rem;font-weight:700;">
+      Viewing: <span id="atViewingName"></span>
+      <button onclick="atClearAuditorView()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.8rem;margin-left:4px;padding:0;">✕</button>
+    </div>
+    <button class="btn-secondary" style="padding:4px 10px;font-size:.72rem;margin-left:auto;" onclick="atDashLoad()">↻ Refresh</button>
+  </div>
+  <div id="atDashLog" style="background:var(--card);border:1px solid rgba(27,144,255,0.2);border-radius:10px;padding:16px;overflow-x:auto;">
+    <div style="color:var(--muted);font-size:.8rem;text-align:center;">Loading…</div>
+  </div>
+
+  <!-- TL View (TL/admin only) -->
+  <div id="atDashTLWrap" style="display:none;margin-top:20px;">
+    <div style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;">Team Performance</div>
+    <div id="atDashTL" style="background:var(--card);border:1px solid rgba(27,144,255,0.2);border-radius:10px;padding:16px;overflow-x:auto;">
+      <div style="color:var(--muted);font-size:.8rem;text-align:center;">Loading…</div>
+    </div>
+  </div>
+
+</div><!-- end page-activity -->
+
   </div>
 </div>
 
@@ -2019,7 +1977,13 @@ function setUser(name, email) {
     // fetch user's group from their leave list entry
     fetchUserGroup(email);
     setTimeout(handleDeepLink, 800);
-    initChangelog(); // show changelog badge if new version
+    initChangelog();
+    // If Activity Tracker is open, reload data now that we have a token
+    setTimeout(() => {
+      if (document.getElementById('page-activity')?.classList.contains('active') && accessToken) {
+        atDashLoad();
+      }
+    }, 1500);
   }
 }
 
@@ -4558,7 +4522,7 @@ function switchTab(tab) {
 
 
 // ══════════════════════════════════════════════
-//  ACTIVITY TRACKER — INLINE + POPOUT
+//  ACTIVITY TRACKER — DASHBOARD + POPUP LAUNCHER
 // ══════════════════════════════════════════════
 const AT_POPUP_KEY = '__atPopup';
 const AT_SP_SITE   = 'https://sap.sharepoint.com/sites/70000013';
@@ -4566,344 +4530,359 @@ const AT_EA_LIST   = 'Tracking%20List%20EA';
 const AT_IC_LIST   = 'Tracking%20List%20IC';
 
 let atPopupWindow  = null;
-let inLOB          = 'IA';
-let inTimerRunning = false;
-let inStartTime    = null;
-let inTimerInterval= null;
-let inTodayCases   = 0;
-let inTodayQ       = 0;
-let inTodayProdMs  = 0;
-let inCaseLog      = [];
-let inSpToken      = null;
-let inSupEmail     = '';
+let atDashPeriod   = 'today';
+let atPollInterval = null;
+let atViewingEmail = ''; // email of auditor being viewed (empty = self)
 
-// ── Pop Out ──
-function atPopOut() {
+// ── Launch / Hibernate / Resume ──
+function atLaunch() {
+  // If popup is already open → bring to front
+  if (atPopupWindow && !atPopupWindow.closed) {
+    atPopupWindow.focus();
+    return;
+  }
+  // Check for pending session → set resume flag
+  const state = atGetState();
+  if (state.timerRunning && state.startTime) {
+    localStorage.setItem(AT_POPUP_KEY + '_resume', '1');
+  }
   const url = window.location.origin + window.location.pathname.replace('index.html','') + 'tracker-popup.html';
-  atPopupWindow = window.open(url, 'atTracker', 'width=380,height=560,resizable=yes,scrollbars=no');
+  atPopupWindow = window.open(url, 'atTracker', 'width=400,height=580,resizable=yes,scrollbars=no');
   if (!atPopupWindow) { showToast('⚠ Popup blocked — allow popups for this site', '#E9730C'); return; }
-  document.getElementById('atInlineTracker').style.display = 'none';
-  document.getElementById('atPoppedMsg').style.display = '';
-  // Save full current state to localStorage for popup to restore
-  const state = {
-    lob:          inLOB,
-    startTime:    inStartTime,
-    timerRunning: inTimerRunning,
-    todayCases:   inTodayCases,
-    todayQ:       inTodayQ,
-    todayProdMs:  inTodayProdMs,
-    fieldId:      document.getElementById('inFieldId')?.value || '',
-    fieldEntity:  document.getElementById('inFieldEntity')?.value || '',
-    fieldQ:       document.getElementById('inFieldQ')?.value || '',
-    fieldCompany: document.getElementById('inFieldCompany')?.value || '',
-  };
-  localStorage.setItem(AT_POPUP_KEY, JSON.stringify(state));
+  atUpdateBadge();
+  atStartPoll();
 }
 
-function atDockBack() {
-  if (atPopupWindow && !atPopupWindow.closed) atPopupWindow.close();
-  atPopupWindow = null;
-  document.getElementById('atInlineTracker').style.display = '';
-  document.getElementById('atPoppedMsg').style.display = 'none';
-  // Restore state from localStorage (popup may have updated it)
-  inRestoreFromStorage();
+function atUpdateBadge() {
+  const active = atPopupWindow && !atPopupWindow.closed;
+  const badge = document.getElementById('atTrackerBadge');
+  const btn   = document.getElementById('atLaunchBtn');
+  if (badge) badge.style.display = active ? '' : 'none';
+  if (btn)   btn.textContent = active ? '🚀 Open Tracker' : '🚀 Launch Tracker';
 }
 
-// Listen for dock message from popup
-window.addEventListener('message', function(e) {
-  if (e.data?.type === 'AT_DOCK') atDockBack();
-});
-
-// Listen for localStorage changes from popup
-window.addEventListener('storage', function(e) {
-  if (e.key === AT_POPUP_KEY + '_ping') inRestoreFromStorage();
-});
-
-function inRestoreFromStorage() {
-  try {
-    const s = JSON.parse(localStorage.getItem(AT_POPUP_KEY) || '{}');
-    if (s.todayCases !== undefined) { inTodayCases = s.todayCases; inTodayQ = s.todayQ || 0; inTodayProdMs = s.todayProdMs || 0; }
-    if (s.lob) inSetLOB(s.lob);
-    if (s.caseLog) { inCaseLog = s.caseLog; inRenderLog(); }
-    inUpdateMetrics();
-  } catch(e) {}
-}
-
-// ── Inline Tracker ──
-let inCurrentImage = null;
-let inTesseractWorker = null;
-let inTesseractReady  = false;
-
-function inSetLOB(l, locked) {
-  inLOB = l;
-  document.getElementById('inLobIA').classList.toggle('active', l === 'IA');
-  document.getElementById('inLobIC').classList.toggle('active', l === 'IC');
-  document.getElementById('inIdLabel').textContent      = l === 'IA' ? 'REPORT ID' : 'BATCH ID';
-  document.getElementById('inQLabel').textContent       = l === 'IA' ? 'QUESTION COUNT' : 'INVOICE COUNT';
-  document.getElementById('inMQPHLbl').textContent      = l === 'IA' ? 'QPH' : 'IPH';
-  document.getElementById('inMCasesLbl').textContent    = l === 'IA' ? 'Reports Today' : 'Batches Today';
-  document.getElementById('inEntityWrap').style.display = l === 'IA' ? '' : 'none';
-  if (locked !== undefined) {
-    ['inLobIA','inLobIC'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) { el.style.opacity = locked ? '0.4' : '1'; el.style.pointerEvents = locked ? 'none' : ''; }
-    });
-  }
-  if (!locked) {
-    ['inFieldId','inFieldEntity','inFieldQ','inFieldCompany'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) { el.value = ''; el.classList.remove('ocr-filled'); }
-    });
-  }
-}
-
-// Paste handler for inline tracker
-document.addEventListener('paste', async function(e) {
-  if (!document.getElementById('page-activity')?.classList.contains('active')) return;
-  if (atPopupWindow && !atPopupWindow.closed) return; // popup is open, ignore
-  const items = e.clipboardData?.items;
-  if (!items) return;
-  let imageFile = null;
-  for (const item of items) { if (item.type.startsWith('image/')) { imageFile = item.getAsFile(); break; } }
-  if (!imageFile) return;
-  inCurrentImage = imageFile;
-  const url = URL.createObjectURL(imageFile);
-  const preview = document.getElementById('inPastePreview');
-  if (preview) { preview.src = url; preview.style.display = 'block'; }
-  const zone = document.getElementById('inPasteZone');
-  if (zone) zone.style.borderColor = '#7ED47E';
-  if (!inTimerRunning) inTimerStart();
-  inShowOcrStatus('⏳ Reading screenshot…', '#FFB57A');
-  await inRunOCR(imageFile);
-});
-
-async function inRunOCR(imageFile) {
-  if (!inTesseractReady || !inTesseractWorker) {
-    inShowOcrStatus('⏳ OCR engine loading…', '#FFB57A');
-    let waited = 0;
-    while (!inTesseractReady && waited < 30000) { await new Promise(r => setTimeout(r, 500)); waited += 500; }
-    if (!inTesseractReady) { inShowOcrStatus('❌ OCR engine unavailable', '#FF4444'); return; }
-  }
-  try {
-    const url = URL.createObjectURL(imageFile);
-    const { data: { text } } = await inTesseractWorker.recognize(url);
-    const parsed = inParseText(text);
-    inFillFields(parsed);
-    const found = Object.values(parsed).filter(Boolean).length;
-    inShowOcrStatus(`✅ ${found} fields detected — ${inLOB === 'IC' ? '🧾 IC' : '📊 IA'} detected`, '#7ED47E');
-  } catch(e) { inShowOcrStatus('❌ OCR failed', '#FF4444'); }
-}
-
-function inParseText(text) {
-  function ex(patterns) { for (const p of patterns) { const m = text.match(p); if (m) return m[1].trim(); } return ''; }
-  return {
-    reportId:      ex([/Report ID[:\s]+([A-Z0-9]{8,})/i]),
-    entityCode:    ex([/Entity Code[:\s]+([\w]+)/i]),
-    companyName:   ex([/Company Name[:\s]+([^\n]+?)(?=\s{2,}|Batch|From|Employee|Report|$)/i]),
-    questionCount: ex([/Total Auditable Line-item questions[:\s]+([\d]+)/i, /Line-item questions[:\s]+([\d]+)/i]),
-    lineItemCount: ex([/Report Line Item Count[:\s]+([\d]+)/i]),
-    batchId:       ex([/Batch ID[:\s]+([\w]+)/i]),
-    invoiceCount:  ex([/of\s+(\d+)\s+invoice/i, /(\d+)\s+invoice\(s\)\s+verified/i]),
-  };
-}
-
-function inFillFields(p) {
-  if (p.batchId && !p.reportId) inSetLOB('IC', false);
-  else inSetLOB('IA', false);
-  function fill(id, val) { if (!val) return; const el = document.getElementById(id); if (el) { el.value = val; el.classList.add('ocr-filled'); } }
-  if (inLOB === 'IC') {
-    fill('inFieldId',      p.batchId);
-    fill('inFieldQ',       p.invoiceCount || p.lineItemCount);
-    fill('inFieldCompany', p.companyName);
-  } else {
-    fill('inFieldId',      p.reportId);
-    fill('inFieldEntity',  p.entityCode);
-    fill('inFieldQ',       p.questionCount || p.lineItemCount);
-    fill('inFieldCompany', p.companyName);
-  }
-}
-
-function inShowOcrStatus(msg, color) {
-  const el = document.getElementById('inOcrStatus');
-  if (el) { el.style.display = 'block'; el.style.color = color || 'var(--muted)'; el.textContent = msg; }
-}
-
-function inTimerStart() {
-  if (inTimerRunning) return;
-  inStartTime    = Date.now();
-  inTimerRunning = true;
-  document.getElementById('inTimerStatus').textContent = 'Timer running…';
-  document.getElementById('inTimerResetBtn').style.display = '';
-  inSetLOB(inLOB, true);
-  inTimerInterval = setInterval(inTickTimer, 1000);
-}
-
-function inTickTimer() {
-  if (!inStartTime) return;
-  const el = Date.now() - inStartTime;
-  const h  = Math.floor(el / 3600000);
-  const m  = Math.floor((el % 3600000) / 60000);
-  const s  = Math.floor((el % 60000) / 1000);
-  document.getElementById('inTimerDisplay').textContent =
-    String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
-}
-
-function inTimerReset() {
-  clearInterval(inTimerInterval);
-  inTimerRunning = false; inStartTime = null; inCurrentImage = null;
-  document.getElementById('inTimerDisplay').textContent = '00:00:00';
-  document.getElementById('inTimerStatus').textContent  = 'Waiting for screenshot paste';
-  document.getElementById('inTimerResetBtn').style.display = 'none';
-  const zone = document.getElementById('inPasteZone');
-  if (zone) zone.style.borderColor = '';
-  const preview = document.getElementById('inPastePreview');
-  if (preview) { preview.style.display = 'none'; preview.src = ''; }
-  const ocrSt = document.getElementById('inOcrStatus');
-  if (ocrSt) ocrSt.style.display = 'none';
-  inSetLOB(inLOB, false);
-}
-
-// Escalation
-function inShowEscalate() { document.getElementById('inEscalatePanel').style.display = ''; }
-function inHideEscalate() { document.getElementById('inEscalatePanel').style.display = 'none'; }
-function inQuitTask() { inTimerReset(); inHideEscalate(); showToast('⏹ Task quit'); }
-async function inEscalateTask() {
-  const selected = document.querySelector('input[name="inEscReason"]:checked');
-  if (!selected) { showToast('⚠ Select an escalation reason', '#E9730C'); return; }
-  const reason = selected.value;
-  const notes  = document.getElementById('inEscNotes').value.trim();
-  const id     = document.getElementById('inFieldId').value.trim();
-  const ec     = document.getElementById('inFieldEntity')?.value.trim() || '';
-  const company= document.getElementById('inFieldCompany')?.value.trim() || '';
-  const endTime = new Date().toISOString();
-  const stTime  = inStartTime ? new Date(inStartTime).toISOString() : endTime;
-  const tok = inSpToken || accessToken;
-  if (!tok) { showToast('⚠ Not connected', '#FF4444'); return; }
-  const payload = {
-    __metadata: { type: 'SP.Data.Tracking_x0020_List_x0020_ExceptionsListItem' },
-    Title: (id||'Exception') + ' — ' + reason, ExceptionStatus: 'Pending',
-    AuditorEmail: currentUser.email, ManagerEmail: inSupEmail,
-    ProcessedDate: new Date().toISOString(), StartTime: stTime, EndTime: endTime,
-    ReportID: inLOB === 'IA' ? id : '', BatchID: inLOB === 'IC' ? id : '',
-    EntityCode: ec, Remarks: reason + (notes ? '\n' + notes : ''),
-    WorkingOn: inLOB, Supervisor: inSupEmail, ClientName: company
-  };
-  try {
-    const dRes = await fetch(AT_SP_SITE + '/_api/contextinfo', { method:'POST', headers:{'Accept':'application/json;odata=verbose','Authorization':'Bearer '+tok}});
-    const digest = (await dRes.json()).d.GetContextWebInformation.FormDigestValue;
-    const res = await fetch(AT_SP_SITE + "/_api/web/lists/getbytitle('Tracking%20List%20Exceptions')/items", {
-      method:'POST', headers:{'Accept':'application/json;odata=verbose','Content-Type':'application/json;odata=verbose','Authorization':'Bearer '+tok,'X-RequestDigest':digest},
-      body: JSON.stringify(payload)
-    });
-    if (res.ok) { showToast('✅ Exception logged', '#E9730C'); }
-    else { showToast('⚠ Exception log failed', '#FF4444'); }
-  } catch(e) { showToast('⚠ Error: ' + e.message, '#FF4444'); }
-  inTimerReset(); inHideEscalate();
-}
-
-async function inSaveEntry(andNext) {
-  const id      = document.getElementById('inFieldId').value.trim();
-  const q       = parseInt(document.getElementById('inFieldQ').value) || 0;
-  const ec      = document.getElementById('inFieldEntity')?.value.trim() || '';
-  const company = document.getElementById('inFieldCompany')?.value.trim() || '';
-  if (!id) { showToast('⚠ Report/Batch ID required', '#E9730C'); return; }
-  if (!inTimerRunning && !inStartTime) { showToast('⚠ Paste a screenshot first', '#E9730C'); return; }
-  const endTime = new Date().toISOString();
-  const stTime  = inStartTime ? new Date(inStartTime).toISOString() : endTime;
-  const durMs   = inStartTime ? (Date.now() - inStartTime) : 0;
-  inTodayCases++; inTodayQ += q; inTodayProdMs += durMs;
-  inCaseLog.unshift({ lob: inLOB, id, q, time: new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}) });
-  inUpdateMetrics(); inRenderLog();
-  await inPostSP(id, q, ec, company, stTime, endTime);
-  inTimerReset();
-  if (andNext) { showToast('✅ Saved — paste next screenshot'); }
-  else { showToast('✅ Saved'); }
-}
-
-async function inPostSP(id, q, ec, company, stTime, endTime) {
-  const tok = inSpToken || accessToken;
-  if (!tok) return;
-  try {
-    const dRes = await fetch(AT_SP_SITE + '/_api/contextinfo', { method:'POST', headers:{'Accept':'application/json;odata=verbose','Authorization':'Bearer '+tok}});
-    const digest = (await dRes.json()).d.GetContextWebInformation.FormDigestValue;
-    const now = new Date().toISOString();
-    let list, payload;
-    if (inLOB === 'IC') {
-      list = AT_IC_LIST;
-      payload = { __metadata:{type:'SP.Data.Tracking_x0020_List_x0020_ICListItem'}, Title: id+' — '+currentUser.name, BatchID:id, ClientName:company, InvoiceCount:String(q), ProcessedDate:now, AuditorEmail:currentUser.email, ManagerEmail:inSupEmail, StartTime:stTime, EndTime:endTime, Supervisor:inSupEmail, WorkingOn:'IC' };
+function atStartPoll() {
+  if (atPollInterval) clearInterval(atPollInterval);
+  atPollInterval = setInterval(() => {
+    if (!atPopupWindow || atPopupWindow.closed) {
+      clearInterval(atPollInterval);
+      atPollInterval = null;
+      atPopupWindow = null;
+      atUpdateBadge();
     } else {
-      list = AT_EA_LIST;
-      payload = { __metadata:{type:'SP.Data.Tracking_x0020_List_x0020_EAListItem'}, Title: id+' — '+currentUser.name, ReportID:id, EntityCode:ec, LineItemCount:String(q), ProcessedDate:now, AuditorEmail:currentUser.email, ManagerEmail:inSupEmail, StartTime:stTime, EndTime:endTime, QuestionCount:q, Supervisor:inSupEmail, WorkingOn:'IA' };
+      atUpdateBadge();
     }
-    const res = await fetch(AT_SP_SITE + "/_api/web/lists/getbytitle('"+list+"')/items", {
-      method:'POST', headers:{'Accept':'application/json;odata=verbose','Content-Type':'application/json;odata=verbose','Authorization':'Bearer '+tok,'X-RequestDigest':digest},
-      body:JSON.stringify(payload)
+  }, 2000);
+}
+
+// Listen for Dock message from popup → popup will close itself, just update badge + refresh
+window.addEventListener('message', function(e) {
+  if (e.data?.type === 'AT_DOCK') {
+    atUpdateBadge();
+    atDashLoad();
+  }
+});
+
+// Refresh dashboard when popup saves data
+window.addEventListener('storage', function(e) {
+  if (e.key === AT_POPUP_KEY + '_ping') atDashLoad();
+});
+
+function atGetState() {
+  try { return JSON.parse(localStorage.getItem(AT_POPUP_KEY) || '{}'); } catch(e) { return {}; }
+}
+
+// ── Dashboard ──
+function atDashSetPeriod(p) {
+  atDashPeriod = p;
+  const activeStyle   = 'background:rgba(0,112,242,0.2);border:1px solid var(--accent);color:var(--text);border-radius:6px;padding:5px 16px;font-size:.78rem;font-weight:700;cursor:pointer;';
+  const inactiveStyle = 'background:rgba(0,0,0,0.2);border:1px solid rgba(27,144,255,0.25);color:var(--muted);border-radius:6px;padding:5px 16px;font-size:.78rem;cursor:pointer;';
+  document.getElementById('atDashBtnToday').style.cssText = p === 'today' ? activeStyle : inactiveStyle;
+  document.getElementById('atDashBtnMTD').style.cssText   = p === 'mtd'   ? activeStyle : inactiveStyle;
+  atDashLoad();
+}
+
+function atDashDateRange() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todayEnd = new Date(); todayEnd.setHours(23,59,59,999);
+  if (atDashPeriod === 'today') return { from: today, to: todayEnd };
+  return { from: new Date(today.getFullYear(), today.getMonth(), 1), to: todayEnd };
+}
+
+async function atDashLoad() {
+  const tok = accessToken;
+  if (!tok) { document.getElementById('atDashLog').innerHTML = '<div style="color:var(--muted);font-size:.8rem;text-align:center;padding:20px;">Loading…</div>'; return; }
+  const viewEmail = atViewingEmail || currentUser.email;
+  const { from, to } = atDashDateRange();
+  const dtFrom = from.toISOString().split('.')[0] + 'Z';
+  const dtTo   = to.toISOString().split('.')[0] + 'Z';
+  // No filter — fetch recent items only (last 60 days), filter by auditor + date client-side
+  const sixtyDaysAgo = new Date(); sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+  const spFilter = `Created ge datetime'${sixtyDaysAgo.toISOString().split('.')[0]}Z'`;
+
+  const lists = [
+    { name: AT_EA_LIST, lob: 'IA' },
+    { name: AT_IC_LIST, lob: 'IC' }
+  ];
+  const limit = atDashPeriod === 'today' ? 2000 : 5000;
+
+  try {
+    const results = await Promise.all(lists.map(async l => {
+      const url = `${AT_SP_SITE}/_api/web/lists/getbytitle('${l.name}')/items?$orderby=Id desc&$top=${limit}`;
+      const res  = await fetch(url, { headers: { 'Accept': 'application/json;odata=verbose', 'Authorization': 'Bearer ' + tok } });
+      const data = await res.json();
+      return (data.d?.results || [])
+        .filter(r => {
+          const auditor = (r.AuditorEmail || '').toLowerCase();
+          if (auditor !== viewEmail.toLowerCase()) return false;
+          const d = new Date(r.ProcessedDate || r.Created || 0);
+          return d >= from && d <= to;
+        })
+        .map(r => ({ ...r, _lob: l.lob }));
+    }));
+    const records = results.flat().sort((a,b) => new Date(b.ProcessedDate||0) - new Date(a.ProcessedDate||0));
+    atDashRenderMetrics(records);
+    atDashRenderLog(records);
+    if (isAgent() || ltIsAdmin()) {
+      document.getElementById('atDashTLWrap').style.display = '';
+      atDashLoadTL(dtFrom, dtTo, tok);
+    }
+  } catch(e) { console.error('[AT dash]', e); }
+}
+
+function atDashRenderMetrics(records) {
+  function calcMetrics(recs) {
+    const cases  = recs.length;
+    // EA uses QuestionCount, IC uses InvoiceCount
+    const q      = recs.reduce((s,r) => s+(parseInt(r.QuestionCount)||parseInt(r.InvoiceCount)||0), 0);
+    const prodMs = recs.reduce((s,r) => (r.StartTime&&r.EndTime)?s+(new Date(r.EndTime)-new Date(r.StartTime)):s, 0);
+    const prodH  = prodMs/3600000;
+    return {
+      cases, q,
+      hrs:  prodH > 0 ? (Math.floor(prodH)+'h '+Math.round((prodH%1)*60)+'m') : '0',
+      qph:  prodH > 0 ? (q/prodH).toFixed(1) : '—',
+      util: prodH > 0 ? Math.min((prodH/8)*100,100).toFixed(0)+'%' : '—'
+    };
+  }
+  const ia = calcMetrics(records.filter(r => r._lob === 'IA'));
+  const ic = calcMetrics(records.filter(r => r._lob === 'IC'));
+  document.getElementById('atDMIA_cases').textContent = ia.cases;
+  document.getElementById('atDMIA_q').textContent     = ia.q;
+  document.getElementById('atDMIA_hrs').textContent   = ia.hrs;
+  document.getElementById('atDMIA_qph').textContent   = ia.qph;
+  document.getElementById('atDMIA_util').textContent  = ia.util;
+  document.getElementById('atDMIC_cases').textContent = ic.cases;
+  document.getElementById('atDMIC_q').textContent     = ic.q;
+  document.getElementById('atDMIC_hrs').textContent   = ic.hrs;
+  document.getElementById('atDMIC_qph').textContent   = ic.qph;
+  document.getElementById('atDMIC_util').textContent  = ic.util;
+}
+
+function atSetAuditorView(email, name) {
+  atViewingEmail = email;
+  const badge = document.getElementById('atViewingBadge');
+  const nameEl = document.getElementById('atViewingName');
+  if (badge) badge.style.display = email ? '' : 'none';
+  if (nameEl) nameEl.textContent = name || email;
+  atDashLoad();
+}
+
+function atClearAuditorView() {
+  atViewingEmail = '';
+  const badge = document.getElementById('atViewingBadge');
+  if (badge) badge.style.display = 'none';
+  atDashLoad();
+}
+
+function atDashRenderLog(records) {
+  const el = document.getElementById('atDashLog');
+  if (!records.length) { el.innerHTML = `<div style="color:var(--muted);font-size:.8rem;text-align:center;padding:20px;">No entries for this period.</div>`; return; }
+  el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:.78rem;">
+    <thead><tr>
+      <th style="color:var(--muted);font-size:.66rem;padding:6px 8px;text-align:left;border-bottom:1px solid rgba(27,144,255,0.15);">LOB</th>
+      <th style="color:var(--muted);font-size:.66rem;padding:6px 8px;text-align:left;border-bottom:1px solid rgba(27,144,255,0.15);">Report / Batch ID</th>
+      <th style="color:var(--muted);font-size:.66rem;padding:6px 8px;text-align:left;border-bottom:1px solid rgba(27,144,255,0.15);">Entity Code</th>
+      <th style="color:var(--muted);font-size:.66rem;padding:6px 8px;text-align:left;border-bottom:1px solid rgba(27,144,255,0.15);">Company</th>
+      <th style="color:var(--muted);font-size:.66rem;padding:6px 8px;text-align:center;border-bottom:1px solid rgba(27,144,255,0.15);">Questions</th>
+      <th style="color:var(--muted);font-size:.66rem;padding:6px 8px;text-align:center;border-bottom:1px solid rgba(27,144,255,0.15);">Invoices</th>
+      <th style="color:var(--muted);font-size:.66rem;padding:6px 8px;text-align:right;border-bottom:1px solid rgba(27,144,255,0.15);">Start Time</th>
+      <th style="color:var(--muted);font-size:.66rem;padding:6px 8px;text-align:right;border-bottom:1px solid rgba(27,144,255,0.15);">Duration</th>
+    </tr></thead><tbody>
+    ${records.map(r => {
+      const id  = r.ReportID || r.BatchID || '—';
+      const ec  = r.EntityCode || '—';
+      const co  = r.ClientName || '—';
+      const q   = parseInt(r.QuestionCount) || 0;
+      const inv = parseInt(r.InvoiceCount)  || 0;
+      // Use StartTime for display (more accurate than ProcessedDate)
+      const startDt = r.StartTime ? new Date(r.StartTime) : null;
+      const tm  = startDt && startDt.getHours() > 0
+        ? startDt.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})
+        : (r.ProcessedDate ? new Date(r.ProcessedDate).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—');
+      const dur = (r.StartTime && r.EndTime) ? (() => { const ms = new Date(r.EndTime)-new Date(r.StartTime); const m=Math.floor(ms/60000); const s=Math.floor((ms%60000)/1000); return m+'m '+s+'s'; })() : '—';
+      return `<tr style="border-bottom:1px solid rgba(27,144,255,0.06);">
+        <td style="padding:6px 8px;"><span class="pill pill-cat" style="font-size:.6rem;">${h(r._lob)}</span></td>
+        <td style="padding:6px 8px;font-family:monospace;font-size:.72rem;">${h(id)}</td>
+        <td style="padding:6px 8px;font-family:monospace;font-size:.72rem;color:var(--muted);">${h(ec)}</td>
+        <td style="padding:6px 8px;font-size:.75rem;">${h(co)}</td>
+        <td style="padding:6px 8px;text-align:center;">${r._lob==='IA'?q:'—'}</td>
+        <td style="padding:6px 8px;text-align:center;">${r._lob==='IC'?inv:'—'}</td>
+        <td style="padding:6px 8px;text-align:right;color:var(--muted);">${tm}</td>
+        <td style="padding:6px 8px;text-align:right;color:var(--muted);">${dur}</td>
+      </tr>`;
+    }).join('')}
+    </tbody></table>`;
+}
+
+async function atDashLoadTL(dtFrom, dtTo, tok) {
+  // Get direct reports from Graph to filter team view
+  let directReportEmails = new Set();
+  try {
+    if (graphToken) {
+      const drRes = await fetch('https://graph.microsoft.com/v1.0/me/directReports?$select=mail', { headers: { 'Authorization': 'Bearer ' + graphToken } });
+      const drData = await drRes.json();
+      (drData.value || []).forEach(u => { if (u.mail) directReportEmails.add(u.mail.toLowerCase()); });
+    }
+  } catch(e) {}
+  // Access control:
+  // - Admin (isAgent/ltIsAdmin) → sees all auditors
+  // - TL → sees only direct reports from Graph
+  // - If Graph fails for TL → show no one (fail secure)
+  const isAdminView = isAgent() || ltIsAdmin();
+  const filterByTeam = !isAdminView; // TLs always filter; admins see all
+
+  const lists  = [
+    { name: AT_EA_LIST },
+    { name: AT_IC_LIST }
+  ];
+  const from = new Date(dtFrom), to = new Date(dtTo);
+  try {
+    const results = await Promise.all(lists.map(async l => {
+      const res = await fetch(`${AT_SP_SITE}/_api/web/lists/getbytitle('${l.name}')/items?$orderby=Id desc&$top=1000`, { headers: { 'Accept':'application/json;odata=verbose','Authorization':'Bearer '+tok }});
+      const data = await res.json();
+      return (data.d?.results || []).filter(r => {
+        const d = new Date(r.ProcessedDate || 0);
+        return d >= from && d <= to;
+      });
+    }));
+    const all = results.flat();
+    const byAuditor = {};
+    all.forEach(r => {
+      const email = (r.AuditorEmail || 'Unknown').toLowerCase();
+      // TL: only show direct reports; Admin: show all
+      if (filterByTeam && !directReportEmails.has(email)) return;
+      if (!byAuditor[email]) byAuditor[email] = [];
+      byAuditor[email].push(r);
     });
-    // Attach screenshot if available
-    if (res.ok && inCurrentImage) {
-      const item = await res.json();
-      const itemId = item.d?.Id;
-      if (itemId) {
-        const dRes2 = await fetch(AT_SP_SITE+'/_api/contextinfo',{method:'POST',headers:{'Accept':'application/json;odata=verbose','Authorization':'Bearer '+tok}});
-        const digest2 = (await dRes2.json()).d.GetContextWebInformation.FormDigestValue;
-        const fname = 'screenshot_'+new Date().toISOString().replace(/[:.]/g,'-')+'.png';
-        const buf = await inCurrentImage.arrayBuffer();
-        await fetch(AT_SP_SITE+"/_api/web/lists/getbytitle('"+list+"')/items("+itemId+")/AttachmentFiles/add(FileName='"+fname+"')",{
-          method:'POST', headers:{'Accept':'application/json;odata=verbose','Authorization':'Bearer '+tok,'X-RequestDigest':digest2,'Content-Type':'application/octet-stream'}, body:buf
-        });
-      }
-    }
-  } catch(e) { console.error('[AT inline]', e); }
+    const rows = Object.entries(byAuditor).map(([email, recs]) => {
+      const iaRecs = recs.filter(r => r.WorkingOn === 'IA' || r.ReportID || r.QuestionCount);
+      const icRecs = recs.filter(r => r.WorkingOn === 'IC' || r.BatchID  || r.InvoiceCount);
+      const iaQ    = iaRecs.reduce((s,r) => s+(parseInt(r.QuestionCount)||0), 0);
+      const icQ    = icRecs.reduce((s,r) => s+(parseInt(r.InvoiceCount)||0), 0);
+      const prodMs = recs.reduce((s,r) => (r.StartTime&&r.EndTime)?s+(new Date(r.EndTime)-new Date(r.StartTime)):s, 0);
+      const prodH  = prodMs/3600000;
+      return {
+        email,
+        iaCases: iaRecs.length, iaQ,
+        icCases: icRecs.length, icQ,
+        prodH,
+        qph:  prodH>0&&iaQ>0?(iaQ/prodH).toFixed(1):'—',
+        iph:  prodH>0&&icQ>0?(icQ/prodH).toFixed(1):'—',
+        util: prodH>0?Math.min((prodH/8)*100,100).toFixed(0)+'%':'—'
+      };
+    }).sort((a,b) => (parseFloat(b.qph)||0) - (parseFloat(a.qph)||0));
+    const tlEl = document.getElementById('atDashTL');
+    if (!rows.length) { tlEl.innerHTML = `<div style="color:var(--muted);font-size:.8rem;text-align:center;padding:20px;">No team data for this period.</div>`; return; }
+    tlEl.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:.78rem;">
+      <thead>
+        <tr>
+          <th rowspan="2" style="color:var(--muted);font-size:.66rem;padding:6px 8px;text-align:left;border-bottom:1px solid rgba(27,144,255,0.15);">Auditor <span style="font-weight:400;font-size:.6rem;">(click to view)</span></th>
+          <th colspan="3" style="color:var(--accent2);font-size:.64rem;padding:4px 8px;text-align:center;border-bottom:1px solid rgba(27,144,255,0.1);border-left:1px solid rgba(27,144,255,0.1);">📊 IA — Expense</th>
+          <th colspan="3" style="color:#89FFD1;font-size:.64rem;padding:4px 8px;text-align:center;border-bottom:1px solid rgba(27,144,255,0.1);border-left:1px solid rgba(27,144,255,0.1);">🧾 IC — Invoice</th>
+          <th rowspan="2" style="color:var(--muted);font-size:.66rem;padding:6px 8px;text-align:center;border-bottom:1px solid rgba(27,144,255,0.15);">Util%</th>
+        </tr>
+        <tr>
+          <th style="color:var(--muted);font-size:.62rem;padding:4px 8px;text-align:center;border-bottom:1px solid rgba(27,144,255,0.15);border-left:1px solid rgba(27,144,255,0.1);">Reports</th>
+          <th style="color:var(--muted);font-size:.62rem;padding:4px 8px;text-align:center;border-bottom:1px solid rgba(27,144,255,0.15);">Questions</th>
+          <th style="color:var(--muted);font-size:.62rem;padding:4px 8px;text-align:center;border-bottom:1px solid rgba(27,144,255,0.15);">QPH</th>
+          <th style="color:var(--muted);font-size:.62rem;padding:4px 8px;text-align:center;border-bottom:1px solid rgba(27,144,255,0.15);border-left:1px solid rgba(27,144,255,0.1);">Batches</th>
+          <th style="color:var(--muted);font-size:.62rem;padding:4px 8px;text-align:center;border-bottom:1px solid rgba(27,144,255,0.15);">Invoices</th>
+          <th style="color:var(--muted);font-size:.62rem;padding:4px 8px;text-align:center;border-bottom:1px solid rgba(27,144,255,0.15);">IPH</th>
+        </tr>
+      </thead><tbody>
+      ${rows.map(r => {
+        const isViewing = r.email === atViewingEmail;
+        const qphColor = parseFloat(r.qph)>=5?'#7ED47E':parseFloat(r.qph)>=3?'#FFB57A':'#FF9999';
+        const iphColor = parseFloat(r.iph)>=5?'#7ED47E':parseFloat(r.iph)>=3?'#FFB57A':'#FF9999';
+        return `<tr onclick="atSetAuditorView('${r.email}','${r.email}')" style="border-bottom:1px solid rgba(27,144,255,0.06);cursor:pointer;${isViewing?'background:rgba(0,112,242,0.12);':''}" onmouseover="this.style.background='rgba(27,144,255,0.06)'" onmouseout="this.style.background='${isViewing?'rgba(0,112,242,0.12)':'transparent'}'">
+          <td style="padding:6px 8px;color:${isViewing?'var(--accent2)':'var(--text)'};">${isViewing?'👁 ':''}${h(r.email)}</td>
+          <td style="padding:6px 8px;text-align:center;border-left:1px solid rgba(27,144,255,0.08);">${r.iaCases||0}</td>
+          <td style="padding:6px 8px;text-align:center;">${r.iaQ||0}</td>
+          <td style="padding:6px 8px;text-align:center;font-weight:700;color:${qphColor};">${r.qph}</td>
+          <td style="padding:6px 8px;text-align:center;border-left:1px solid rgba(27,144,255,0.08);">${r.icCases||0}</td>
+          <td style="padding:6px 8px;text-align:center;">${r.icQ||0}</td>
+          <td style="padding:6px 8px;text-align:center;font-weight:700;color:${iphColor};">${r.iph}</td>
+          <td style="padding:6px 8px;text-align:center;">${r.util}</td>
+        </tr>`;
+      }).join('')}
+      </tbody></table>`;
+  } catch(e) { console.error('[AT TL]', e); }
 }
 
-function inUpdateMetrics() {
-  document.getElementById('inMCases').textContent = inTodayCases;
-  const prodH = inTodayProdMs / 3600000;
-  document.getElementById('inMQPH').textContent  = prodH > 0 ? (inTodayQ / prodH).toFixed(1) : '—';
-  document.getElementById('inMUtil').textContent = prodH > 0 ? Math.min((prodH / 8) * 100, 100).toFixed(0) + '%' : '—';
-}
-
-function inRenderLog() {
-  const el = document.getElementById('inCaseLog');
-  if (!inCaseLog.length) { el.innerHTML = '<span style="color:var(--muted);">No entries yet.</span>'; return; }
-  el.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:.76rem;">' +
-    '<thead><tr>' +
-    '<th style="color:var(--muted);font-size:.66rem;padding:4px 8px;text-align:left;border-bottom:1px solid rgba(27,144,255,0.15);">LOB</th>' +
-    '<th style="color:var(--muted);font-size:.66rem;padding:4px 8px;text-align:left;border-bottom:1px solid rgba(27,144,255,0.15);">ID</th>' +
-    '<th style="color:var(--muted);font-size:.66rem;padding:4px 8px;text-align:center;border-bottom:1px solid rgba(27,144,255,0.15);">Q</th>' +
-    '<th style="color:var(--muted);font-size:.66rem;padding:4px 8px;text-align:right;border-bottom:1px solid rgba(27,144,255,0.15);">Time</th>' +
-    '</tr></thead><tbody>' +
-    inCaseLog.slice(0,20).map(c =>
-      `<tr><td style="padding:5px 8px;"><span class="pill pill-cat" style="font-size:.6rem;">${h(c.lob)}</span></td>` +
-      `<td style="padding:5px 8px;font-family:monospace;font-size:.72rem;">${h(c.id)}</td>` +
-      `<td style="padding:5px 8px;text-align:center;">${c.q}</td>` +
-      `<td style="padding:5px 8px;text-align:right;color:var(--muted);">${c.time}</td></tr>`
-    ).join('') + '</tbody></table>';
+function atDashLOBChange() {
+  const lob = document.getElementById('atDashLOB')?.value || '';
+  // Update metric labels based on LOB
+  const casesLbl = document.getElementById('atDMCasesLbl');
+  const qphLbl   = document.getElementById('atDMQPHLbl');
+  if (casesLbl) casesLbl.textContent = lob === 'IC' ? 'Batches' : lob === 'IA' ? 'Reports' : 'Cases';
+  if (qphLbl)   qphLbl.textContent   = lob === 'IC' ? 'IPH' : 'QPH';
+  atDashLoad();
 }
 
 function initActivityTracker() {
-  inSetLOB('IA');
-  // Fetch supervisor via Graph if token available
-  if (graphToken) {
-    fetch('https://graph.microsoft.com/v1.0/me/manager?$select=mail', {
-      headers: { 'Authorization': 'Bearer ' + graphToken }
-    }).then(r => r.json()).then(d => { inSupEmail = d.mail || ''; }).catch(() => {});
+  atUpdateBadge();
+  if (isAgent() || ltIsAdmin()) {
+    document.getElementById('atDashTLWrap').style.display = '';
   }
-  // Load Tesseract for inline OCR (once)
-  if (!inTesseractReady && !inTesseractWorker) inLoadTesseract();
+  if (accessToken) {
+    atDashLoad();
+  } else {
+    let tries = 0;
+    const poll = setInterval(() => {
+      tries++;
+      if (accessToken) { clearInterval(poll); atDashLoad(); atLoadAuditorSelector(); }
+      else if (tries > 20) { clearInterval(poll); document.getElementById('atDashLog').innerHTML = '<div style="color:var(--muted);font-size:.8rem;text-align:center;padding:20px;">Sign in to view data.</div>'; }
+    }, 500);
+  }
 }
 
-function inLoadTesseract() {
-  const script = document.createElement('script');
-  script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
-  script.onload = async () => {
-    try {
-      inTesseractWorker = await Tesseract.createWorker('eng');
-      inTesseractReady = true;
-    } catch(e) { console.error('[AT OCR]', e); }
-  };
-  document.head.appendChild(script);
+async function atLoadAuditorSelector() {
+  const tok = accessToken;
+  if (!tok) return;
+  try {
+    // Use Created filter (indexed) to get recent items safely
+    const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const spFilter = `Created ge datetime'${thirtyDaysAgo.toISOString().split('.')[0]}Z'`;
+    const [eaRes, icRes] = await Promise.all([
+      fetch(`${AT_SP_SITE}/_api/web/lists/getbytitle('${AT_EA_LIST}')/items?$orderby=Id desc&$top=500`, { headers: { 'Accept':'application/json;odata=verbose','Authorization':'Bearer '+tok } }),
+      fetch(`${AT_SP_SITE}/_api/web/lists/getbytitle('${AT_IC_LIST}')/items?$orderby=Id desc&$top=500`, { headers: { 'Accept':'application/json;odata=verbose','Authorization':'Bearer '+tok } })
+    ]);
+    const ea = (await eaRes.json()).d?.results || [];
+    const ic = (await icRes.json()).d?.results || [];
+    if (ea.length) console.log('[AT EA fields]', Object.keys(ea[0]).filter(k => !k.startsWith('__') && !k.startsWith('odata')).join(', '));
+    const emails = [...new Set([...ea,...ic].map(r => r.AuditorEmail || '').filter(Boolean))].sort();
+    const sel = document.getElementById('atDevAuditor');
+    if (sel && emails.length) {
+      sel.innerHTML = '<option value="">— View as auditor —</option>' +
+        emails.map(e => {
+          const agent = ALL_AGENTS.find(a => a.email === e);
+          return `<option value="${h(e)}">${h(agent ? agent.name : e)}</option>`;
+        }).join('');
+    }
+  } catch(e) { console.error('[AT auditor sel]', e); }
 }
+
+
 
 // ══════════════════════════════════════════════
 //  TIPS / SOP
