@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Activity Tracker</title>
+<style>
+  :root{--bg:#0d1b2a;--card:#102236;--accent:#0070F2;--accent2:#89D1FF;--text:#E8F4FF;--muted:#6B8FAF;--border:rgba(27,144,255,0.25);}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;height:100vh;display:flex;flex-direction:column;overflow:hidden;user-select:none;}
+  .header{background:var(--card);border-bottom:1px solid var(--border);padding:8px 12px;display:flex;align-items:center;gap:8px;flex-shrink:0;}
+  .header-title{font-weight:700;font-size:.82rem;color:var(--accent2);flex:1;}
+  .dock-btn{background:none;border:1px solid var(--border);color:var(--muted);border-radius:5px;padding:3px 8px;font-size:.7rem;cursor:pointer;}
+  .dock-btn:hover{border-color:var(--accent);color:var(--text);}
+  .body{flex:1;overflow-y:auto;padding:10px;}
+  .lob-tabs{display:flex;gap:6px;margin-bottom:10px;}
+  .lob-tab{flex:1;padding:6px;border:1px solid var(--border);border-radius:6px;background:rgba(0,0,0,.2);color:var(--muted);font-size:.76rem;font-weight:700;cursor:pointer;text-align:center;transition:all .15s;}
+  .lob-tab.active{background:rgba(0,112,242,0.2);border-color:var(--accent);color:var(--text);}
+
+  /* Paste zone */
+  .paste-zone{border:2px dashed rgba(27,144,255,0.4);border-radius:8px;padding:14px;text-align:center;cursor:pointer;margin-bottom:10px;background:rgba(0,112,242,0.04);transition:all .2s;position:relative;}
+  .paste-zone:hover,.paste-zone.drag-over{border-color:var(--accent);background:rgba(0,112,242,0.1);}
+  .paste-zone.has-image{border-color:#7ED47E;background:rgba(24,137,24,0.06);border-style:solid;}
+  .paste-zone-label{font-size:.74rem;color:var(--muted);pointer-events:none;}
+  .paste-zone-label b{color:var(--accent2);}
+  .paste-preview{max-width:100%;max-height:60px;border-radius:4px;margin-top:6px;display:none;}
+  .ocr-status{font-size:.68rem;margin-top:4px;display:none;}
+
+  /* Timer */
+  .timer-block{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:10px;text-align:center;}
+  .timer-display{font-size:1.6rem;font-weight:700;color:var(--accent2);letter-spacing:2px;font-variant-numeric:tabular-nums;}
+  .timer-sub{font-size:.66rem;color:var(--muted);margin-top:2px;}
+  .btn-row{display:flex;gap:6px;margin-top:8px;}
+  .btn{flex:1;padding:7px;border-radius:6px;font-size:.74rem;font-weight:700;cursor:pointer;border:none;transition:all .15s;}
+  .btn-primary{background:var(--accent);color:#fff;}
+  .btn-primary:hover{background:#005ac4;}
+  .btn-secondary{background:rgba(27,144,255,0.12);border:1px solid var(--border);color:var(--text);}
+  .btn-secondary:hover{border-color:var(--accent);}
+  .btn-danger{background:rgba(255,80,80,0.12);border:1px solid rgba(255,80,80,0.3);color:#FF9999;}
+  .btn-green{background:rgba(24,137,24,0.2);border:1px solid rgba(24,137,24,0.4);color:#7ED47E;}
+  .btn-green:hover{background:rgba(24,137,24,0.35);}
+
+  /* Fields */
+  .field{margin-bottom:8px;}
+  .field label{display:block;font-size:.66rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;}
+  .field input{width:100%;background:rgba(0,0,0,.25);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 9px;font-size:.78rem;outline:none;transition:border-color .15s;}
+  .field input:focus{border-color:var(--accent);}
+  .field input.ocr-filled{border-color:#7ED47E;background:rgba(24,137,24,0.06);}
+
+  /* Metrics */
+  .metrics{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:10px;}
+  .metric{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:8px;text-align:center;}
+  .metric-val{font-size:1rem;font-weight:700;color:var(--accent2);}
+  .metric-lbl{font-size:.6rem;color:var(--muted);margin-top:2px;}
+
+  /* Toast */
+  .toast{position:fixed;bottom:10px;right:10px;left:10px;background:var(--accent);color:#fff;padding:8px 12px;border-radius:6px;font-size:.75rem;font-weight:700;z-index:999;display:none;text-align:center;}
+
+  /* Status bar */
+  .status-bar{background:var(--card);border-top:1px solid var(--border);padding:4px 12px;font-size:.64rem;color:var(--muted);flex-shrink:0;display:flex;align-items:center;gap:5px;}
+  .dot{width:6px;height:6px;border-radius:50%;background:#888;display:inline-block;flex-shrink:0;}
+  .dot.ok{background:#7ED47E;}
+  .dot.warn{background:#FFB57A;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <span>⏱</span>
+  <div class="header-title">Activity Tracker</div>
+  <button class="dock-btn" onclick="dockBack()">↩ Dock</button>
+</div>
+
+<div class="body">
+
+  <!-- LOB -->
+  <div class="lob-tabs">
+    <div class="lob-tab active" id="lobIA" onclick="setLOB('IA')">📊 IA — Expense</div>
+    <div class="lob-tab" id="lobIC" onclick="setLOB('IC')">🧾 IC — Invoice</div>
+  </div>
+
+  <!-- Paste Zone -->
+  <div class="paste-zone" id="pasteZone" tabindex="0">
+    <div class="paste-zone-label">📋 <b>Ctrl+V</b> to paste Concur screenshot<br><span style="font-size:.66rem;">Timer starts automatically on paste</span></div>
+    <img class="paste-preview" id="pastePreview" />
+    <div class="ocr-status" id="ocrStatus"></div>
+  </div>
+
+  <!-- Timer -->
+  <div class="timer-block">
+    <div class="timer-display" id="timerDisplay">00:00:00</div>
+    <div class="timer-sub" id="timerSub">Waiting for screenshot paste</div>
+    <div class="btn-row">
+      <button class="btn btn-danger" id="timerResetBtn" onclick="timerReset()" style="display:none;">↺ Reset</button>
+    </div>
+  </div>
+
+  <!-- Fields -->
+  <div class="field" id="fieldIdWrap">
+    <label id="idLabel">Report ID</label>
+    <input type="text" id="fieldId" placeholder="Auto-filled from screenshot" />
+  </div>
+  <div class="field" id="fieldEntityWrap">
+    <label>Entity Code</label>
+    <input type="text" id="fieldEntity" placeholder="Auto-filled from screenshot" />
+  </div>
+  <div class="field">
+    <label id="qLabel">Question Count</label>
+    <input type="number" id="fieldQ" placeholder="Auto-filled from screenshot" min="0" />
+  </div>
+  <div class="field" id="fieldCompanyWrap">
+    <label>Company / Client</label>
+    <input type="text" id="fieldCompany" placeholder="Auto-filled from screenshot" />
+  </div>
+
+  <!-- Save Buttons -->
+  <div class="btn-row">
+    <button class="btn btn-green" onclick="saveEntry(true)">✓ Save &amp; Next</button>
+    <button class="btn btn-secondary" onclick="saveEntry(false)">✓ Save &amp; Done</button>
+  </div>
+  <div class="btn-row" style="margin-top:6px;">
+    <button class="btn btn-danger" onclick="showEscalatePanel()" style="font-size:.72rem;">⚠ Quit / Escalate</button>
+  </div>
+
+  <!-- Escalation Panel (hidden by default) -->
+  <div id="escalatePanel" style="display:none;margin-top:10px;background:rgba(233,115,12,0.08);border:1px solid rgba(233,115,12,0.35);border-radius:8px;padding:12px;">
+    <div style="font-weight:700;font-size:.78rem;color:#FFB57A;margin-bottom:10px;">⚠ Task Workflow — Escalation</div>
+    <div style="font-size:.72rem;color:var(--muted);margin-bottom:8px;">Select escalation reason:</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-bottom:10px;" id="escalateRadios">
+      <label style="display:flex;align-items:center;gap:5px;font-size:.73rem;cursor:pointer;padding:3px 0;"><input type="radio" name="escReason" value="Chinese" style="accent-color:#E9730C;" /> Chinese</label>
+      <label style="display:flex;align-items:center;gap:5px;font-size:.73rem;cursor:pointer;padding:3px 0;"><input type="radio" name="escReason" value="Japanese" style="accent-color:#E9730C;" /> Japanese</label>
+      <label style="display:flex;align-items:center;gap:5px;font-size:.73rem;cursor:pointer;padding:3px 0;"><input type="radio" name="escReason" value="Korean" style="accent-color:#E9730C;" /> Korean</label>
+      <label style="display:flex;align-items:center;gap:5px;font-size:.73rem;cursor:pointer;padding:3px 0;"><input type="radio" name="escReason" value="German" style="accent-color:#E9730C;" /> German</label>
+      <label style="display:flex;align-items:center;gap:5px;font-size:.73rem;cursor:pointer;padding:3px 0;"><input type="radio" name="escReason" value="Portuguese/Spanish" style="accent-color:#E9730C;" /> Portuguese/Spanish</label>
+      <label style="display:flex;align-items:center;gap:5px;font-size:.73rem;cursor:pointer;padding:3px 0;"><input type="radio" name="escReason" value="Portuguese" style="accent-color:#E9730C;" /> Portuguese</label>
+      <label style="display:flex;align-items:center;gap:5px;font-size:.73rem;cursor:pointer;padding:3px 0;"><input type="radio" name="escReason" value="Spanish" style="accent-color:#E9730C;" /> Spanish</label>
+      <label style="display:flex;align-items:center;gap:5px;font-size:.73rem;cursor:pointer;padding:3px 0;"><input type="radio" name="escReason" value="French" style="accent-color:#E9730C;" /> French</label>
+      <label style="display:flex;align-items:center;gap:5px;font-size:.73rem;cursor:pointer;padding:3px 0;"><input type="radio" name="escReason" value="Thai" style="accent-color:#E9730C;" /> Thai</label>
+      <label style="display:flex;align-items:center;gap:5px;font-size:.73rem;cursor:pointer;padding:3px 0;"><input type="radio" name="escReason" value="Vietnamese" style="accent-color:#E9730C;" /> Vietnamese</label>
+      <label style="display:flex;align-items:center;gap:5px;font-size:.73rem;cursor:pointer;padding:3px 0;"><input type="radio" name="escReason" value="Arabic" style="accent-color:#E9730C;" /> Arabic</label>
+      <label style="display:flex;align-items:center;gap:5px;font-size:.73rem;cursor:pointer;padding:3px 0;"><input type="radio" name="escReason" value="Invoice" style="accent-color:#E9730C;" /> Invoice</label>
+      <label style="display:flex;align-items:center;gap:5px;font-size:.73rem;cursor:pointer;padding:3px 0;"><input type="radio" name="escReason" value="Tax Question" style="accent-color:#E9730C;" /> Tax Question</label>
+      <label style="display:flex;align-items:center;gap:5px;font-size:.73rem;cursor:pointer;padding:3px 0;"><input type="radio" name="escReason" value="Client Services" style="accent-color:#E9730C;" /> Client Services</label>
+    </div>
+    <div style="margin-bottom:8px;">
+      <div style="font-size:.66rem;color:var(--muted);margin-bottom:3px;">ESCALATION NOTES</div>
+      <textarea id="escalateNotes" rows="2" style="width:100%;background:rgba(0,0,0,.25);border:1px solid rgba(233,115,12,0.3);color:var(--text);border-radius:6px;padding:6px 9px;font-size:.76rem;outline:none;resize:none;" placeholder="Optional notes…"></textarea>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="hideEscalatePanel()" style="font-size:.72rem;">← Back</button>
+      <button class="btn btn-danger" onclick="quitTask()" style="font-size:.72rem;">Quit Task</button>
+      <button class="btn" onclick="escalateTask()" style="background:rgba(233,115,12,0.2);border:1px solid rgba(233,115,12,0.5);color:#FFB57A;font-size:.72rem;font-weight:700;">⚠ Escalate Task</button>
+    </div>
+  </div>
+
+  <!-- Metrics -->
+  <div class="metrics">
+    <div class="metric"><div class="metric-val" id="mCases">0</div><div class="metric-lbl" id="mCasesLbl">Reports</div></div>
+    <div class="metric"><div class="metric-val" id="mQPH">—</div><div class="metric-lbl" id="mQPHLbl">QPH</div></div>
+    <div class="metric"><div class="metric-val" id="mUtil">—</div><div class="metric-lbl">Util%</div></div>
+  </div>
+
+</div>
+
+<div class="status-bar">
+  <span class="dot" id="statusDot"></span>
+  <span id="statusText">Connecting…</span>
+  <span style="margin-left:auto;" id="ocrEngineStatus"></span>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Constants ──
+const CLIENT_ID = '0221d9d4-3f55-463c-97c8-ce6f021e5858';
+const TENANT_ID = '42f7676c-f455-423c-82f6-dc2d99791af7';
+const SP_SITE   = 'https://sap.sharepoint.com/sites/70000013';
+const EA_LIST   = "Tracking List EA";
+const IC_LIST   = "Tracking List IC";
+const SK        = '__atPopup';
+
+// ── State ──
+let lob            = 'IA';
+let timerRunning   = false;
+let startTime      = null;
+let timerInterval  = null;
+let spToken        = null;
+let auditorEmail   = '';
+let supervisorEmail= '';
+let todayCases     = 0;
+let todayQ         = 0;
+let todayProdMs    = 0;
+let currentImage   = null; // Blob of pasted screenshot
+let tesseractReady = false;
+let tesseractWorker= null;
+
+// ── Escalation ──
+const EX_LIST = 'Tracking%20List%20Exceptions';
+
+function showEscalatePanel() {
+  document.getElementById('escalatePanel').style.display = '';
+  // Clear previous selection
+  document.querySelectorAll('input[name="escReason"]').forEach(r => r.checked = false);
+  document.getElementById('escalateNotes').value = '';
+}
+
+function hideEscalatePanel() {
+  document.getElementById('escalatePanel').style.display = 'none';
+}
+
+function quitTask() {
+  timerReset();
+  hideEscalatePanel();
+  showToast('⏹ Task quit — timer reset', '#888');
+}
+
+async function escalateTask() {
+  const selected = document.querySelector('input[name="escReason"]:checked');
+  if (!selected) { showToast('⚠ Select an escalation reason', '#E9730C'); return; }
+  const reason = selected.value;
+  const notes  = document.getElementById('escalateNotes').value.trim();
+  const id     = document.getElementById('fieldId').value.trim();
+  const ec     = document.getElementById('fieldEntity')?.value.trim() || '';
+  const company= document.getElementById('fieldCompany')?.value.trim() || '';
+  const endTime = new Date().toISOString();
+  const stTime  = startTime ? new Date(startTime).toISOString() : endTime;
+  const now     = new Date().toISOString();
+
+  if (!spToken) { showToast('⚠ Not connected to SharePoint', '#FF4444'); return; }
+
+  const payload = {
+    __metadata: { type: 'SP.Data.Tracking_x0020_List_x0020_ExceptionsListItem' },
+    Title:           (id || 'Exception') + ' — ' + reason,
+    ExceptionStatus: 'Pending',
+    AuditorEmail:    auditorEmail,
+    ManagerEmail:    supervisorEmail,
+    ProcessedDate:   now,
+    StartTime:       stTime,
+    EndTime:         endTime,
+    ReportID:        lob === 'IA' ? id : '',
+    BatchID:         lob === 'IC' ? id : '',
+    EntityCode:      ec,
+    Remarks:         reason + (notes ? '\n' + notes : ''),
+    WorkingOn:       lob,
+    Supervisor:      supervisorEmail,
+    ClientName:      company
+  };
+
+  showToast('💾 Logging exception…', '#E9730C');
+  const itemId = await postToSP(EX_LIST, payload);
+  if (itemId && currentImage) await attachScreenshot(EX_LIST, itemId, currentImage);
+
+  if (itemId) {
+    showToast('✅ Exception logged', '#E9730C');
+  } else {
+    showToast('⚠ Exception log failed', '#FF4444');
+  }
+
+  timerReset();
+  hideEscalatePanel();
+}
+
+// ── LOB ──
+function setLOB(l, locked) {
+  lob = l;
+  document.getElementById('lobIA').classList.toggle('active', l === 'IA');
+  document.getElementById('lobIC').classList.toggle('active', l === 'IC');
+  // Lock/unlock tabs
+  const lockStyle = locked ? 'opacity:.4;cursor:not-allowed;pointer-events:none;' : '';
+  document.getElementById('lobIA').style.cssText += lockStyle;
+  document.getElementById('lobIC').style.cssText += lockStyle;
+  if (locked) {
+    document.getElementById('lobIA').onclick = null;
+    document.getElementById('lobIC').onclick = null;
+  } else {
+    document.getElementById('lobIA').onclick = () => setLOB('IA');
+    document.getElementById('lobIC').onclick = () => setLOB('IC');
+  }
+  document.getElementById('idLabel').textContent      = l === 'IA' ? 'Report ID' : 'Batch ID';
+  document.getElementById('qLabel').textContent       = l === 'IA' ? 'Question Count' : 'Invoice Count';
+  document.getElementById('mQPHLbl').textContent      = l === 'IA' ? 'QPH' : 'IPH';
+  document.getElementById('fieldEntityWrap').style.display = l === 'IA' ? '' : 'none';
+  const casesLbl = document.getElementById('mCasesLbl');
+  if (casesLbl) casesLbl.textContent = l === 'IA' ? 'Reports' : 'Batches';
+  // Clear fields when switching LOB
+  ['fieldId','fieldEntity','fieldQ','fieldCompany'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.value = ''; el.classList.remove('ocr-filled'); }
+  });
+}
+
+// ── Timer ──
+function timerStart() {
+  if (timerRunning) return;
+  startTime    = Date.now();
+  timerRunning = true;
+  document.getElementById('timerSub').textContent = 'Timer running…';
+  document.getElementById('timerResetBtn').style.display = '';
+  setLOB(lob, true); // lock LOB tabs
+  timerInterval = setInterval(tickTimer, 1000);
+  saveState();
+}
+
+function tickTimer() {
+  const el = Date.now() - startTime;
+  const h  = Math.floor(el / 3600000);
+  const m  = Math.floor((el % 3600000) / 60000);
+  const s  = Math.floor((el % 60000) / 1000);
+  document.getElementById('timerDisplay').textContent =
+    String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+}
+
+function timerReset() {
+  clearInterval(timerInterval);
+  timerRunning = false; startTime = null;
+  document.getElementById('timerDisplay').textContent = '00:00:00';
+  document.getElementById('timerSub').textContent = 'Waiting for screenshot paste';
+  document.getElementById('timerResetBtn').style.display = 'none';
+  setLOB(lob, false); // unlock LOB tabs
+  clearFields();
+  resetPasteZone();
+  saveState();
+}
+
+function clearFields() {
+  ['fieldId','fieldEntity','fieldQ','fieldCompany'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.value = ''; el.classList.remove('ocr-filled'); }
+  });
+  currentImage = null;
+}
+
+function resetPasteZone() {
+  const z = document.getElementById('pasteZone');
+  z.classList.remove('has-image');
+  document.getElementById('pastePreview').style.display = 'none';
+  document.getElementById('ocrStatus').style.display = 'none';
+}
+
+// ── Paste Handler ──
+document.addEventListener('paste', async function(e) {
+  const items = e.clipboardData?.items;
+  if (!items) return;
+  let imageFile = null;
+  for (const item of items) {
+    if (item.type.startsWith('image/')) { imageFile = item.getAsFile(); break; }
+  }
+  if (!imageFile) return;
+
+  // Show preview
+  currentImage = imageFile;
+  const url = URL.createObjectURL(imageFile);
+  const preview = document.getElementById('pastePreview');
+  preview.src = url;
+  preview.style.display = 'block';
+  document.getElementById('pasteZone').classList.add('has-image');
+
+  // Start timer immediately
+  if (!timerRunning) timerStart();
+
+  // Run OCR
+  showOCRStatus('⏳ Reading text from screenshot…', '#FFB57A');
+  await runOCR(imageFile);
+});
+
+async function runOCR(imageFile) {
+  if (!tesseractReady || !tesseractWorker) {
+    showOCRStatus('⏳ OCR engine still loading, please wait…', '#FFB57A');
+    // Wait for it
+    let waited = 0;
+    while (!tesseractReady && waited < 30000) {
+      await new Promise(r => setTimeout(r, 500));
+      waited += 500;
+    }
+    if (!tesseractReady) { showOCRStatus('❌ OCR engine failed to load', '#FF4444'); return; }
+  }
+  try {
+    const url = URL.createObjectURL(imageFile);
+    const { data: { text } } = await tesseractWorker.recognize(url);
+    const parsed = parseText(text);
+    fillFields(parsed);
+    saveState();
+    const found = Object.values(parsed).filter(Boolean).length;
+    const detectedLOB = lob === 'IC' ? '🧾 IC detected' : '📊 IA detected';
+    showOCRStatus(`✅ ${found} fields detected — ${detectedLOB}`, '#7ED47E');
+  } catch(e) {
+    showOCRStatus('❌ OCR failed: ' + e.message, '#FF4444');
+  }
+}
+
+function parseText(text) {
+  function ex(patterns) {
+    for (const p of patterns) { const m = text.match(p); if (m) return m[1].trim(); }
+    return '';
+  }
+  return {
+    reportId:      ex([/Report ID[:\s]+([A-Z0-9]{8,})/i]),
+    entityCode:    ex([/Entity Code[:\s]+([\w]+)/i]),
+    companyName:   ex([/Company Name[:\s]+([^\n]+?)(?=\s{2,}|Batch|From|Employee|Report|$)/i]),
+    employeeName:  ex([/Employee Name[:\s]+([^\n]+?)(?=\s{2,}|$)/i]),
+    date:          ex([/Date[:\s]+([\d\/]+)/i]),
+    totalAmount:   ex([/Report Total Amount[:\s]+([^\n]+?)(?=\s{2,}|Report|$)/i]),
+    lineItemCount: ex([/Report Line Item Count[:\s]+([\d]+)/i, /Line Item Count[:\s]+([\d]+)/i]),
+    auditableItems:ex([/Total Auditable Items[:\s]+([\d]+)/i]),
+    questionCount: ex([/Total Auditable Line-item questions[:\s]+([\d]+)/i, /Line-item questions[:\s]+([\d]+)/i]),
+    batchId:       ex([/Batch ID[:\s]+([\w]+)/i, /Batch\s+ID[:\s]+([\d]+)/i]),
+    invoiceCount:  ex([/of\s+(\d+)\s+invoice/i, /(\d+)\s+invoice\(s\)\s+verified/i, /Invoice Count[:\s]+([\d]+)/i]),
+  };
+}
+
+function fillFields(p) {
+  // Auto-detect LOB first — setLOB also clears fields, lock=false so we can still fill
+  if (p.batchId && !p.reportId) {
+    setLOB('IC', false);
+  } else {
+    setLOB('IA', false);
+  }
+
+  function fill(id, val) {
+    if (!val) return;
+    const el = document.getElementById(id);
+    if (el) { el.value = val; el.classList.add('ocr-filled'); }
+  }
+
+  if (lob === 'IC') {
+    fill('fieldId',      p.batchId);
+    fill('fieldQ',       p.invoiceCount || p.lineItemCount);
+    fill('fieldCompany', p.companyName);
+  } else {
+    fill('fieldId',      p.reportId);
+    fill('fieldEntity',  p.entityCode);
+    fill('fieldQ',       p.questionCount || p.lineItemCount);
+    fill('fieldCompany', p.companyName);
+  }
+}
+
+function showOCRStatus(msg, color) {
+  const el = document.getElementById('ocrStatus');
+  el.style.display = 'block';
+  el.style.color = color || 'var(--muted)';
+  el.textContent = msg;
+}
+
+// ── Save Entry ──
+async function saveEntry(andNext) {
+  const id      = document.getElementById('fieldId').value.trim();
+  const q       = parseInt(document.getElementById('fieldQ').value) || 0;
+  const ec      = document.getElementById('fieldEntity')?.value.trim() || '';
+  const company = document.getElementById('fieldCompany')?.value.trim() || '';
+
+  if (!id) { showToast('⚠ Report/Batch ID is required', '#E9730C'); return; }
+  if (!timerRunning && !startTime) { showToast('⚠ No active timer — paste a screenshot first', '#E9730C'); return; }
+
+  const endTime = new Date().toISOString();
+  const stTime  = startTime ? new Date(startTime).toISOString() : endTime;
+  const durMs   = startTime ? (Date.now() - startTime) : 0;
+
+  todayCases++;
+  todayQ      += q;
+  todayProdMs += durMs;
+  updateMetrics();
+
+  showToast('💾 Saving…', '#0070F2');
+
+  // Build payload
+  const now = new Date().toISOString();
+  let list, payload, spListName;
+  if (lob === 'IC') {
+    spListName = IC_LIST;
+    list = 'Tracking%20List%20IC';
+    payload = {
+      __metadata: { type: 'SP.Data.Tracking_x0020_List_x0020_ICListItem' },
+      Title: id + ' — ' + (auditorEmail.split('@')[0] || ''),
+      BatchID: id, ClientName: company, InvoiceCount: String(q),
+      ProcessedDate: now, AuditorEmail: auditorEmail, ManagerEmail: supervisorEmail,
+      StartTime: stTime, EndTime: endTime, Supervisor: supervisorEmail, WorkingOn: 'IC'
+    };
+  } else {
+    spListName = EA_LIST;
+    list = 'Tracking%20List%20EA';
+    payload = {
+      __metadata: { type: 'SP.Data.Tracking_x0020_List_x0020_EAListItem' },
+      Title: id + ' — ' + (auditorEmail.split('@')[0] || ''),
+      ReportID: id, EntityCode: ec, LineItemCount: String(q),
+      ProcessedDate: now, AuditorEmail: auditorEmail, ManagerEmail: supervisorEmail,
+      StartTime: stTime, EndTime: endTime, QuestionCount: q,
+      Supervisor: supervisorEmail, WorkingOn: 'IA'
+    };
+  }
+
+  // Post to SP + attach screenshot
+  if (spToken) {
+    const itemId = await postToSP(list, payload);
+    if (itemId && currentImage) {
+      await attachScreenshot(list, itemId, currentImage);
+    }
+    showToast('✅ Saved & screenshot attached');
+    loadTodayStats(); // refresh counts from SP
+  } else {
+    showToast('⚠ Not connected to SharePoint', '#FF4444');
+  }
+
+  // Broadcast to main portal
+  const s = getState();
+  s.todayCases = todayCases; s.todayQ = todayQ; s.todayProdMs = todayProdMs;
+  s.lastSaved = { lob, id, q, endTime };
+  setState(s);
+
+  // Reset for next
+  timerReset();
+  if (andNext) {
+    // Brief delay then auto-focus paste zone
+    setTimeout(() => {
+      document.getElementById('pasteZone').focus();
+      showToast('⏳ Ready for next — paste screenshot');
+    }, 300);
+  }
+}
+
+async function postToSP(list, data) {
+  try {
+    const dRes = await fetch(SP_SITE + '/_api/contextinfo', {
+      method: 'POST',
+      headers: { 'Accept': 'application/json;odata=verbose', 'Authorization': 'Bearer ' + spToken }
+    });
+    const dData = await dRes.json();
+    const digest = dData.d.GetContextWebInformation.FormDigestValue;
+    const res = await fetch(SP_SITE + '/_api/web/lists/getbytitle(\'' + list + '\')/items', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json;odata=verbose',
+        'Content-Type': 'application/json;odata=verbose',
+        'Authorization': 'Bearer ' + spToken,
+        'X-RequestDigest': digest
+      },
+      body: JSON.stringify(data)
+    });
+    if (res.ok) {
+      const d = await res.json();
+      return d.d?.Id || null;
+    }
+    return null;
+  } catch(e) { console.error('[AT SP]', e); return null; }
+}
+
+async function attachScreenshot(list, itemId, imageFile) {
+  try {
+    const dRes = await fetch(SP_SITE + '/_api/contextinfo', {
+      method: 'POST',
+      headers: { 'Accept': 'application/json;odata=verbose', 'Authorization': 'Bearer ' + spToken }
+    });
+    const dData = await dRes.json();
+    const digest = dData.d.GetContextWebInformation.FormDigestValue;
+    const fileName = 'screenshot_' + new Date().toISOString().replace(/[:.]/g,'-') + '.png';
+    const arrayBuf = await imageFile.arrayBuffer();
+    await fetch(
+      SP_SITE + '/_api/web/lists/getbytitle(\'' + list + '\')/items(' + itemId + ')/AttachmentFiles/add(FileName=\'' + fileName + '\')',
+      {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json;odata=verbose',
+          'Authorization': 'Bearer ' + spToken,
+          'X-RequestDigest': digest,
+          'Content-Type': 'application/octet-stream'
+        },
+        body: arrayBuf
+      }
+    );
+  } catch(e) { console.error('[AT Attach]', e); }
+}
+
+// ── Metrics ──
+function updateMetrics() {
+  document.getElementById('mCases').textContent = todayCases;
+  const prodH = todayProdMs / 3600000;
+  document.getElementById('mQPH').textContent  = prodH > 0 ? (todayQ / prodH).toFixed(1) : '—';
+  document.getElementById('mUtil').textContent = prodH > 0 ? Math.min((prodH / 8) * 100, 100).toFixed(0) + '%' : '—';
+}
+
+// ── Auth ──
+function initAuth() {
+  const script = document.createElement('script');
+  script.src = 'https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js';
+  script.onload = () => {
+    const app = new msal.PublicClientApplication({
+      auth: { clientId: CLIENT_ID, authority: 'https://login.microsoftonline.com/' + TENANT_ID }
+    });
+    app.handleRedirectPromise().then(() => {
+      const accounts = app.getAllAccounts();
+      if (!accounts.length) { setStatus(false, 'Sign in to Reporting Portal first'); return; }
+      auditorEmail = accounts[0].username;
+      app.acquireTokenSilent({ scopes: ['https://sap.sharepoint.com/AllSites.Manage'], account: accounts[0] })
+        .then(r => {
+          spToken = r.accessToken;
+          setStatus(true, auditorEmail);
+          loadTodayStats(); // load today's real counts from SP
+          // Get supervisor
+          app.acquireTokenSilent({ scopes: ['https://graph.microsoft.com/User.Read', 'https://graph.microsoft.com/User.ReadBasic.All'], account: accounts[0] })
+            .then(g => {
+              fetch('https://graph.microsoft.com/v1.0/me/manager?$select=mail', {
+                headers: { 'Authorization': 'Bearer ' + g.accessToken }
+              }).then(x => x.json()).then(d => { supervisorEmail = d.mail || ''; }).catch(() => {});
+            }).catch(() => {});
+        })
+        .catch(() => setStatus(false, 'Auth failed'));
+    });
+  };
+  document.head.appendChild(script);
+}
+
+// ── Load Tesseract ──
+function loadTesseract() {
+  document.getElementById('ocrEngineStatus').textContent = '⏳ Loading OCR…';
+  const script = document.createElement('script');
+  script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+  script.onload = async () => {
+    try {
+      tesseractWorker = await Tesseract.createWorker('eng');
+      tesseractReady = true;
+      document.getElementById('ocrEngineStatus').textContent = '✅ OCR ready';
+    } catch(e) {
+      document.getElementById('ocrEngineStatus').textContent = '❌ OCR failed';
+    }
+  };
+  script.onerror = () => {
+    document.getElementById('ocrEngineStatus').textContent = '❌ OCR load failed';
+  };
+  document.head.appendChild(script);
+}
+
+// ── Load Today's Stats from SP ──
+async function loadTodayStats() {
+  if (!spToken || !auditorEmail) return;
+  const today = new Date();
+  const dtStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
+  const dtEnd   = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59).toISOString();
+  const filter  = `AuditorEmail eq '${auditorEmail}' and ProcessedDate ge datetime'${dtStart}' and ProcessedDate le datetime'${dtEnd}'`;
+  const select  = `Id,QuestionCount,InvoiceCount,StartTime,EndTime`;
+  try {
+    const [eaRes, icRes] = await Promise.all([
+      fetch(`${SP_SITE}/_api/web/lists/getbytitle('${EA_LIST}')/items?$filter=${encodeURIComponent(filter)}&$select=${select}&$top=500`, { headers: { 'Accept': 'application/json;odata=verbose', 'Authorization': 'Bearer ' + spToken } }),
+      fetch(`${SP_SITE}/_api/web/lists/getbytitle('${IC_LIST}')/items?$filter=${encodeURIComponent(filter)}&$select=${select}&$top=500`, { headers: { 'Accept': 'application/json;odata=verbose', 'Authorization': 'Bearer ' + spToken } })
+    ]);
+    const eaData = await eaRes.json();
+    const icData = await icRes.json();
+    const eaItems = eaData.d?.results || [];
+    const icItems = icData.d?.results || [];
+    const allItems = [...eaItems, ...icItems];
+    // Count cases and questions
+    todayCases = allItems.length;
+    todayQ     = allItems.reduce((s, r) => s + (parseInt(r.QuestionCount) || parseInt(r.InvoiceCount) || 0), 0);
+    // Sum productive hours from Start/End times
+    todayProdMs = allItems.reduce((s, r) => {
+      if (!r.StartTime || !r.EndTime) return s;
+      return s + (new Date(r.EndTime) - new Date(r.StartTime));
+    }, 0);
+    updateMetrics();
+  } catch(e) { console.error('[AT] loadTodayStats', e); }
+}
+
+// ── Helpers ──
+function setStatus(ok, msg) {
+  document.getElementById('statusDot').className = 'dot' + (ok ? ' ok' : '');
+  document.getElementById('statusText').textContent = msg;
+}
+function showToast(msg, color) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = color || '#188918';
+  t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 2500);
+}
+function getState() { try { return JSON.parse(localStorage.getItem(SK) || '{}'); } catch(e) { return {}; } }
+function setState(d) { localStorage.setItem(SK, JSON.stringify(d)); localStorage.setItem(SK + '_ping', Date.now()); }
+
+function saveState() {
+  const fieldId      = document.getElementById('fieldId')?.value || '';
+  const fieldEntity  = document.getElementById('fieldEntity')?.value || '';
+  const fieldQ       = document.getElementById('fieldQ')?.value || '';
+  const fieldCompany = document.getElementById('fieldCompany')?.value || '';
+  setState({
+    lob, startTime, timerRunning,
+    todayCases, todayQ, todayProdMs,
+    fieldId, fieldEntity, fieldQ, fieldCompany,
+  });
+}
+
+function restoreState() {
+  const s = getState();
+  if (!s || !Object.keys(s).length) return;
+  // Restore LOB (without clearing fields)
+  if (s.lob) {
+    lob = s.lob;
+    document.getElementById('lobIA').classList.toggle('active', s.lob === 'IA');
+    document.getElementById('lobIC').classList.toggle('active', s.lob === 'IC');
+    document.getElementById('idLabel').textContent      = s.lob === 'IA' ? 'Report ID' : 'Batch ID';
+    document.getElementById('qLabel').textContent       = s.lob === 'IA' ? 'Question Count' : 'Invoice Count';
+    document.getElementById('mQPHLbl').textContent      = s.lob === 'IA' ? 'QPH' : 'IPH';
+    document.getElementById('fieldEntityWrap').style.display = s.lob === 'IA' ? '' : 'none';
+    const casesLbl = document.getElementById('mCasesLbl');
+    if (casesLbl) casesLbl.textContent = s.lob === 'IA' ? 'Reports' : 'Batches';
+  }
+  // Restore fields
+  if (s.fieldId)      { const el = document.getElementById('fieldId');      if (el) { el.value = s.fieldId;      el.classList.add('ocr-filled'); } }
+  if (s.fieldEntity)  { const el = document.getElementById('fieldEntity');  if (el) { el.value = s.fieldEntity;  el.classList.add('ocr-filled'); } }
+  if (s.fieldQ)       { const el = document.getElementById('fieldQ');       if (el) { el.value = s.fieldQ;       el.classList.add('ocr-filled'); } }
+  if (s.fieldCompany) { const el = document.getElementById('fieldCompany'); if (el) { el.value = s.fieldCompany; el.classList.add('ocr-filled'); } }
+  // Restore metrics
+  if (s.todayCases !== undefined) { todayCases = s.todayCases; todayQ = s.todayQ || 0; todayProdMs = s.todayProdMs || 0; }
+  updateMetrics();
+  // Restore timer
+  if (s.timerRunning && s.startTime) {
+    startTime    = s.startTime;
+    timerRunning = true;
+    document.getElementById('timerSub').textContent = 'Timer running…';
+    document.getElementById('timerResetBtn').style.display = '';
+    // Lock LOB tabs since timer is running
+    document.getElementById('lobIA').onclick = null;
+    document.getElementById('lobIC').onclick = null;
+    document.getElementById('lobIA').style.opacity = s.lob === 'IA' ? '1' : '0.4';
+    document.getElementById('lobIA').style.pointerEvents = s.lob === 'IA' ? '' : 'none';
+    document.getElementById('lobIC').style.opacity = s.lob === 'IC' ? '1' : '0.4';
+    document.getElementById('lobIC').style.pointerEvents = s.lob === 'IC' ? '' : 'none';
+    timerInterval = setInterval(tickTimer, 1000);
+  }
+}
+function dockBack() {
+  saveState();
+  if (window.opener && !window.opener.closed) {
+    window.opener.postMessage({ type: 'AT_DOCK' }, '*');
+    window.opener.focus();
+  }
+  window.close();
+}
+
+// ── Init ──
+// Set default LOB without clearing fields (state not loaded yet)
+lob = 'IA';
+document.getElementById('lobIA').classList.add('active');
+restoreState(); // restore any previous session — this sets LOB, fields, timer correctly
+initAuth();
+loadTesseract();
+
+// Focus paste zone so Ctrl+V works immediately
+window.addEventListener('load', () => {
+  document.getElementById('pasteZone').focus();
+});
+</script>
+</body>
+</html>
