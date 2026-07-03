@@ -102,6 +102,7 @@
     <div class="timer-display" id="timerDisplay">00:00:00</div>
     <div class="timer-sub" id="timerSub">Waiting for screenshot paste</div>
     <div class="btn-row">
+      <button class="btn btn-secondary" id="timerStartBtn" onclick="timerStartManual()" style="font-size:.72rem;">▶ Start Timer (Downtime)</button>
       <button class="btn btn-danger" id="timerResetBtn" onclick="timerReset()" style="display:none;">↺ Reset</button>
     </div>
   </div>
@@ -443,11 +444,18 @@ function timerStart() {
   startTime    = Date.now();
   timerRunning = true;
   document.getElementById('timerSub').textContent = 'Timer running…';
+  document.getElementById('timerStartBtn').style.display = 'none';
   document.getElementById('timerResetBtn').style.display = '';
-  setLOB(lob, true);    // lock LOB tabs
-  setServer(currentServer, true); // lock server tabs
+  setLOB(lob, true);
+  setServer(currentServer, true);
   timerInterval = setInterval(tickTimer, 1000);
   saveState();
+}
+
+function timerStartManual() {
+  timerStart();
+  document.getElementById('timerSub').textContent = '⏱ Downtime — timer running…';
+  showToast('⏱ Downtime timer started', '#E9730C');
 }
 
 function tickTimer() {
@@ -465,8 +473,9 @@ function timerReset() {
   document.getElementById('timerDisplay').textContent = '00:00:00';
   document.getElementById('timerSub').textContent = 'Waiting for screenshot paste';
   document.getElementById('timerResetBtn').style.display = 'none';
-  setLOB(lob, false);    // unlock LOB tabs
-  setServer(currentServer, false); // unlock server tabs
+  document.getElementById('timerStartBtn').style.display = '';
+  setLOB(lob, false);
+  setServer(currentServer, false);
   clearFields();
   resetPasteZone();
   saveState();
@@ -988,6 +997,7 @@ function restoreState() {
     timerRunning = true;
     document.getElementById('timerSub').textContent = 'Timer running…';
     document.getElementById('timerResetBtn').style.display = '';
+    document.getElementById('timerStartBtn').style.display = 'none';
     // Lock LOB tabs since timer is running
     document.getElementById('lobIA').onclick = null;
     document.getElementById('lobIC').onclick = null;
