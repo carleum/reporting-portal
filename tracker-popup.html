@@ -56,6 +56,11 @@
   /* Toast */
   .toast{position:fixed;bottom:10px;right:10px;left:10px;background:var(--accent);color:#fff;padding:8px 12px;border-radius:6px;font-size:.75rem;font-weight:700;z-index:999;display:none;text-align:center;}
 
+  /* Exception dropdown */
+  .exc-select{width:100%;background:rgba(0,0,0,.25);border:1px solid rgba(233,115,12,0.35);color:var(--text);border-radius:6px;padding:6px 9px;font-size:.78rem;outline:none;cursor:pointer;transition:border-color .15s;}
+  .exc-select:focus{border-color:#E9730C;}
+  .exc-select option{background:#102236;color:var(--text);}
+
   /* Status bar */
   .status-bar{background:var(--card);border-top:1px solid var(--border);padding:4px 12px;font-size:.64rem;color:var(--muted);flex-shrink:0;display:flex;align-items:center;gap:5px;}
   .dot{width:6px;height:6px;border-radius:50%;background:#888;display:inline-block;flex-shrink:0;}
@@ -122,34 +127,124 @@
     <button class="btn btn-danger" onclick="showEscalatePanel()" style="font-size:.72rem;">⚠ Quit / Escalate</button>
   </div>
 
-  <!-- Escalation Panel (hidden by default) -->
+  <!-- Exception Filing Panel (hidden by default) -->
   <div id="escalatePanel" style="display:none;margin-top:10px;background:rgba(233,115,12,0.08);border:1px solid rgba(233,115,12,0.35);border-radius:8px;padding:12px;">
-    <div style="font-weight:700;font-size:.78rem;color:#FFB57A;margin-bottom:10px;">⚠ Task Workflow — Escalation</div>
-    <div style="font-size:.72rem;color:var(--muted);margin-bottom:8px;">Select escalation reason:</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-bottom:10px;" id="escalateRadios">
-      <label style="display:flex;align-items:center;gap:5px;font-size:.73rem;cursor:pointer;padding:3px 0;"><input type="radio" name="escReason" value="Chinese" style="accent-color:#E9730C;" /> Chinese</label>
-      <label style="display:flex;align-items:center;gap:5px;font-size:.73rem;cursor:pointer;padding:3px 0;"><input type="radio" name="escReason" value="Japanese" style="accent-color:#E9730C;" /> Japanese</label>
-      <label style="display:flex;align-items:center;gap:5px;font-size:.73rem;cursor:pointer;padding:3px 0;"><input type="radio" name="escReason" value="Korean" style="accent-color:#E9730C;" /> Korean</label>
-      <label style="display:flex;align-items:center;gap:5px;font-size:.73rem;cursor:pointer;padding:3px 0;"><input type="radio" name="escReason" value="German" style="accent-color:#E9730C;" /> German</label>
-      <label style="display:flex;align-items:center;gap:5px;font-size:.73rem;cursor:pointer;padding:3px 0;"><input type="radio" name="escReason" value="Portuguese/Spanish" style="accent-color:#E9730C;" /> Portuguese/Spanish</label>
-      <label style="display:flex;align-items:center;gap:5px;font-size:.73rem;cursor:pointer;padding:3px 0;"><input type="radio" name="escReason" value="Portuguese" style="accent-color:#E9730C;" /> Portuguese</label>
-      <label style="display:flex;align-items:center;gap:5px;font-size:.73rem;cursor:pointer;padding:3px 0;"><input type="radio" name="escReason" value="Spanish" style="accent-color:#E9730C;" /> Spanish</label>
-      <label style="display:flex;align-items:center;gap:5px;font-size:.73rem;cursor:pointer;padding:3px 0;"><input type="radio" name="escReason" value="French" style="accent-color:#E9730C;" /> French</label>
-      <label style="display:flex;align-items:center;gap:5px;font-size:.73rem;cursor:pointer;padding:3px 0;"><input type="radio" name="escReason" value="Thai" style="accent-color:#E9730C;" /> Thai</label>
-      <label style="display:flex;align-items:center;gap:5px;font-size:.73rem;cursor:pointer;padding:3px 0;"><input type="radio" name="escReason" value="Vietnamese" style="accent-color:#E9730C;" /> Vietnamese</label>
-      <label style="display:flex;align-items:center;gap:5px;font-size:.73rem;cursor:pointer;padding:3px 0;"><input type="radio" name="escReason" value="Arabic" style="accent-color:#E9730C;" /> Arabic</label>
-      <label style="display:flex;align-items:center;gap:5px;font-size:.73rem;cursor:pointer;padding:3px 0;"><input type="radio" name="escReason" value="Invoice" style="accent-color:#E9730C;" /> Invoice</label>
-      <label style="display:flex;align-items:center;gap:5px;font-size:.73rem;cursor:pointer;padding:3px 0;"><input type="radio" name="escReason" value="Tax Question" style="accent-color:#E9730C;" /> Tax Question</label>
-      <label style="display:flex;align-items:center;gap:5px;font-size:.73rem;cursor:pointer;padding:3px 0;"><input type="radio" name="escReason" value="Client Services" style="accent-color:#E9730C;" /> Client Services</label>
-    </div>
+    <div style="font-weight:700;font-size:.78rem;color:#FFB57A;margin-bottom:10px;">⚠ File an Exception</div>
+
+    <!-- Exception Type dropdown -->
     <div style="margin-bottom:8px;">
-      <div style="font-size:.66rem;color:var(--muted);margin-bottom:3px;">ESCALATION NOTES</div>
-      <textarea id="escalateNotes" rows="2" style="width:100%;background:rgba(0,0,0,.25);border:1px solid rgba(233,115,12,0.3);color:var(--text);border-radius:6px;padding:6px 9px;font-size:.76rem;outline:none;resize:none;" placeholder="Optional notes…"></textarea>
+      <div style="font-size:.66rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Exception Type</div>
+      <select id="excType" class="exc-select" onchange="onExcTypeChange()">
+        <option value="">— Select exception type —</option>
+        <optgroup label="Escalation">
+          <option>Escalated - Foreign</option>
+          <option>Escalated - On Hold / Delete</option>
+          <option>Incorrectly Escalated Report / Batch</option>
+        </optgroup>
+        <optgroup label="No Work">
+          <option>No Work - Expedite Auditor</option>
+          <option>No Work - Low volume</option>
+          <option>No Work - Retagging</option>
+          <option>No Work - System Issue</option>
+          <option>No Work - Transfer to another server</option>
+        </optgroup>
+        <optgroup label="System / Tool Issues">
+          <option>Access Denied</option>
+          <option>Application Error</option>
+          <option>Auto Logout</option>
+          <option>Laptop Issue - Hardware</option>
+          <option>Laptop Issue - Software</option>
+          <option>PDF Error</option>
+          <option>Report Crashed</option>
+          <option>Report Locked</option>
+          <option>Report Lost</option>
+          <option>Stuck Batch</option>
+          <option>SWB Loading / Buffering</option>
+          <option>Unable to save &amp; submit</option>
+          <option>Whitescreen</option>
+          <option>Wiki / Workzone Error</option>
+        </optgroup>
+        <optgroup label="Training / Development">
+          <option>Bootcamp</option>
+          <option>Calibration</option>
+          <option>Coaching</option>
+          <option>Dox Capture</option>
+          <option>E-Learning</option>
+          <option>FGD</option>
+          <option>Proficiency Assessment</option>
+          <option>Refresher TRN</option>
+          <option>Training</option>
+          <option>Work Mastery Exam</option>
+        </optgroup>
+        <optgroup label="KSP">
+          <option>KSP - Attendee Icon Error</option>
+          <option>KSP Appointments</option>
+          <option>KSP Breakfast</option>
+          <option>KSP Breaks</option>
+          <option>KSP Care days</option>
+          <option>KSP Meetings</option>
+          <option>KSP Team build</option>
+          <option>KSP Training</option>
+        </optgroup>
+        <optgroup label="MNL Low Volume">
+          <option>MNL Low Volume - Calibration</option>
+          <option>MNL Low Volume - Coaching</option>
+          <option>MNL Low Volume - E-Learning</option>
+          <option>MNL Low Volume - Experts Activities</option>
+          <option>MNL Low Volume - Huddle / FGD</option>
+          <option>MNL Low Volume - IT-Related Issue</option>
+          <option>MNL Low Volume - Management Initiated</option>
+          <option>MNL Low Volume - Refresher TRN</option>
+          <option>MNL Low Volume - WME</option>
+        </optgroup>
+        <optgroup label="Meetings / Activities">
+          <option>Annotation</option>
+          <option>Earthquake / Fire Drill</option>
+          <option>HMC Task</option>
+          <option>Huddle / Team Meeting</option>
+          <option>Lactation</option>
+          <option>Management Initiated</option>
+          <option>MNL Experts Activities</option>
+          <option>Office Clinic</option>
+          <option>OPI</option>
+          <option>Receipt Handling</option>
+          <option>Receipt Translation</option>
+          <option>RnR Activity</option>
+          <option>Returning Report</option>
+        </optgroup>
+      </select>
     </div>
+
+    <!-- Foreign Language sub-selector (shown only when Escalated - Foreign) -->
+    <div id="foreignLangWrap" style="display:none;margin-bottom:8px;">
+      <div style="font-size:.66rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Foreign Language</div>
+      <select id="foreignLang" class="exc-select">
+        <option value="">— Select language —</option>
+        <option>Arabic</option>
+        <option>Chinese</option>
+        <option>French</option>
+        <option>German</option>
+        <option>Japanese</option>
+        <option>Korean</option>
+        <option>Portuguese</option>
+        <option>Portuguese/Spanish</option>
+        <option>Spanish</option>
+        <option>Thai</option>
+        <option>Vietnamese</option>
+        <option>Other</option>
+      </select>
+    </div>
+
+    <!-- Notes -->
+    <div style="margin-bottom:10px;">
+      <div style="font-size:.66rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;">Notes <span style="font-weight:400;text-transform:none;">(optional)</span></div>
+      <textarea id="escalateNotes" rows="2" style="width:100%;background:rgba(0,0,0,.25);border:1px solid rgba(233,115,12,0.3);color:var(--text);border-radius:6px;padding:6px 9px;font-size:.76rem;outline:none;resize:none;" placeholder="Add context if needed…"></textarea>
+    </div>
+
     <div class="btn-row">
       <button class="btn btn-secondary" onclick="hideEscalatePanel()" style="font-size:.72rem;">← Back</button>
       <button class="btn btn-danger" onclick="quitTask()" style="font-size:.72rem;">Quit Task</button>
-      <button class="btn" onclick="escalateTask()" style="background:rgba(233,115,12,0.2);border:1px solid rgba(233,115,12,0.5);color:#FFB57A;font-size:.72rem;font-weight:700;">⚠ Escalate Task</button>
+      <button class="btn" onclick="escalateTask()" style="background:rgba(233,115,12,0.2);border:1px solid rgba(233,115,12,0.5);color:#FFB57A;font-size:.72rem;font-weight:700;">📋 File Exception</button>
     </div>
   </div>
 
@@ -194,18 +289,26 @@ let currentImage   = null; // Blob of pasted screenshot
 let tesseractReady = false;
 let tesseractWorker= null;
 
-// ── Escalation ──
-const EX_LIST = 'Tracking%20List%20Exceptions';
+// ── Exception Filing ──
+const EX_LIST     = 'Tracking%20List%20Exceptions';
+const EX_LIST_RAW = 'Tracking List Exceptions';
 
 function showEscalatePanel() {
   document.getElementById('escalatePanel').style.display = '';
-  // Clear previous selection
-  document.querySelectorAll('input[name="escReason"]').forEach(r => r.checked = false);
+  document.getElementById('excType').value = '';
+  document.getElementById('foreignLang').value = '';
+  document.getElementById('foreignLangWrap').style.display = 'none';
   document.getElementById('escalateNotes').value = '';
 }
 
 function hideEscalatePanel() {
   document.getElementById('escalatePanel').style.display = 'none';
+}
+
+function onExcTypeChange() {
+  const val = document.getElementById('excType').value;
+  document.getElementById('foreignLangWrap').style.display = val === 'Escalated - Foreign' ? '' : 'none';
+  if (val !== 'Escalated - Foreign') document.getElementById('foreignLang').value = '';
 }
 
 function quitTask() {
@@ -215,22 +318,37 @@ function quitTask() {
 }
 
 async function escalateTask() {
-  const selected = document.querySelector('input[name="escReason"]:checked');
-  if (!selected) { showToast('⚠ Select an escalation reason', '#E9730C'); return; }
-  const reason = selected.value;
-  const notes  = document.getElementById('escalateNotes').value.trim();
-  const id     = document.getElementById('fieldId').value.trim();
-  const ec     = document.getElementById('fieldEntity')?.value.trim() || '';
-  const company= document.getElementById('fieldCompany')?.value.trim() || '';
+  const excType = document.getElementById('excType').value;
+  if (!excType) { showToast('⚠ Select an exception type', '#E9730C'); return; }
+
+  // If foreign escalation, language is required
+  let language = '';
+  if (excType === 'Escalated - Foreign') {
+    language = document.getElementById('foreignLang').value;
+    if (!language) { showToast('⚠ Select the foreign language', '#E9730C'); return; }
+  }
+
+  const notes   = document.getElementById('escalateNotes').value.trim();
+  const id      = document.getElementById('fieldId').value.trim();
+  const ec      = document.getElementById('fieldEntity')?.value.trim() || '';
+  const company = document.getElementById('fieldCompany')?.value.trim() || '';
   const endTime = new Date().toISOString();
   const stTime  = startTime ? new Date(startTime).toISOString() : endTime;
   const now     = new Date().toISOString();
+
+  // Build Remarks: "Exception Type [— Language] [notes]"
+  let remarks = excType;
+  if (language) remarks += ' — ' + language;
+  if (notes)    remarks += '\n' + notes;
+
+  // Title: ID (if any) + exception type
+  const titleBase = id ? (id + ' — ' + excType) : excType;
 
   if (!spToken) { showToast('⚠ Not connected to SharePoint', '#FF4444'); return; }
 
   const payload = {
     __metadata: { type: 'SP.Data.Tracking_x0020_List_x0020_ExceptionsListItem' },
-    Title:           (id || 'Exception') + ' — ' + reason,
+    Title:           titleBase,
     ExceptionStatus: 'Pending',
     AuditorEmail:    auditorEmail,
     ManagerEmail:    supervisorEmail,
@@ -240,20 +358,20 @@ async function escalateTask() {
     ReportID:        lob === 'IA' ? id : '',
     BatchID:         lob === 'IC' ? id : '',
     EntityCode:      ec,
-    Remarks:         reason + (notes ? '\n' + notes : ''),
+    Remarks:         remarks,
     WorkingOn:       lob,
     Supervisor:      supervisorEmail,
     ClientName:      company
   };
 
-  showToast('💾 Logging exception…', '#E9730C');
+  showToast('💾 Filing exception…', '#E9730C');
   const itemId = await postToSP(EX_LIST, payload);
   if (itemId && currentImage) await attachScreenshot(EX_LIST, itemId, currentImage);
 
   if (itemId) {
-    showToast('✅ Exception logged', '#E9730C');
+    showToast('✅ Exception filed — ' + excType, '#7ED47E');
   } else {
-    showToast('⚠ Exception log failed', '#FF4444');
+    showToast('⚠ Exception filing failed', '#FF4444');
   }
 
   timerReset();
