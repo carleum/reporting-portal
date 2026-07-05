@@ -588,9 +588,7 @@ document.addEventListener('paste', async function(e) {
   preview.style.display = 'block';
   document.getElementById('pasteZone').classList.add('has-image');
 
-  // Start timer immediately
-  if (!timerRunning) timerStart();
-
+  // Don't start timer yet — wait for OCR to confirm a valid report/batch ID
   // Run OCR
   showOCRStatus('⏳ Reading text from screenshot…', '#FFB57A');
   await runOCR(imageFile);
@@ -685,10 +683,24 @@ async function runOCR(imageFile) {
     const parsed = parseText(text);
     fillFields(parsed);
     saveState();
+
+    const hasId = !!(parsed.reportId || parsed.batchId);
     const found = Object.values(parsed).filter(Boolean).length;
     const detectedLOB = lob === 'IC' ? '🧾 IC' : '📊 IA';
     const detectedSrv = parsed.server ? ` · ${parsed.server.toUpperCase()}` : '';
-    showOCRStatus(`✅ ${found} fields detected — ${detectedLOB}${detectedSrv}`, '#7ED47E');
+
+    if (hasId) {
+      // Valid report screenshot — start timer
+      if (!timerRunning) timerStart();
+      showOCRStatus(`✅ ${found} fields detected — ${detectedLOB}${detectedSrv}`, '#7ED47E');
+    } else {
+      // No report/batch ID found — reject the screenshot
+      currentImage = null;
+      resetPasteZone();
+      clearFields();
+      showOCRStatus('⚠ No report ID detected — paste a Concur audit screenshot', '#FF4444');
+      showToast('⚠ Invalid screenshot — no Report/Batch ID found', '#FF4444');
+    }
   } catch(e) {
     showOCRStatus('❌ OCR failed: ' + e.message, '#FF4444');
   }
