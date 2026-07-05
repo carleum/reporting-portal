@@ -87,12 +87,6 @@
     <div class="lob-tab" id="lobIC" onclick="setLOB('IC')">🧾 IC — Invoice</div>
   </div>
 
-  <!-- Server selection -->
-  <div style="display:flex;gap:6px;margin-bottom:10px;">
-    <button id="srvUS2" onclick="setServer('US2')" style="flex:1;padding:6px;border-radius:6px;font-size:.76rem;font-weight:700;cursor:pointer;border:2px solid #0070F2;background:rgba(0,112,242,0.2);color:#E8F4FF;">US2</button>
-    <button id="srvEU2" onclick="setServer('EU2')" style="flex:1;padding:6px;border-radius:6px;font-size:.76rem;font-weight:700;cursor:pointer;border:1px solid rgba(27,144,255,0.25);background:rgba(0,0,0,.2);color:#6B8FAF;">EU2</button>
-  </div>
-
   <!-- Paste Zone -->
   <div class="paste-zone" id="pasteZone" tabindex="0">
     <div class="paste-zone-label">📋 <b>Ctrl+V</b> to paste Concur screenshot<br><span style="font-size:.66rem;">Timer starts automatically on paste</span></div>
@@ -469,26 +463,9 @@ function setLOB(l, locked) {
   });
 }
 
-// ── Server ──
+// ── Server — auto-detected from OCR, no manual buttons ──
 function setServer(s) {
   currentServer = s;
-  const us2 = document.getElementById('srvUS2');
-  const eu2 = document.getElementById('srvEU2');
-  if (s === 'US2') {
-    us2.style.border = '2px solid #0070F2';
-    us2.style.background = 'rgba(0,112,242,0.2)';
-    us2.style.color = '#E8F4FF';
-    eu2.style.border = '1px solid rgba(27,144,255,0.25)';
-    eu2.style.background = 'rgba(0,0,0,.2)';
-    eu2.style.color = '#6B8FAF';
-  } else {
-    eu2.style.border = '2px solid #0070F2';
-    eu2.style.background = 'rgba(0,112,242,0.2)';
-    eu2.style.color = '#E8F4FF';
-    us2.style.border = '1px solid rgba(27,144,255,0.25)';
-    us2.style.background = 'rgba(0,0,0,.2)';
-    us2.style.color = '#6B8FAF';
-  }
   saveState();
 }
 
