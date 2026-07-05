@@ -81,16 +81,16 @@
 
 <div class="body">
 
-  <!-- LOB + Server row -->
+  <!-- LOB tabs -->
+  <div class="lob-tabs">
+    <div class="lob-tab active" id="lobIA" onclick="setLOB('IA')">📊 IA — Expense</div>
+    <div class="lob-tab" id="lobIC" onclick="setLOB('IC')">🧾 IC — Invoice</div>
+  </div>
+
+  <!-- Server selection -->
   <div style="display:flex;gap:6px;margin-bottom:10px;">
-    <div class="lob-tabs" style="flex:1;margin-bottom:0;">
-      <div class="lob-tab active" id="lobIA" onclick="setLOB('IA')">📊 IA</div>
-      <div class="lob-tab" id="lobIC" onclick="setLOB('IC')">🧾 IC</div>
-    </div>
-    <div style="display:flex;gap:4px;">
-      <div class="lob-tab active" id="srvUS2" onclick="setServer('US2')" style="flex:none;padding:6px 10px;font-size:.73rem;">US2</div>
-      <div class="lob-tab" id="srvEU2" onclick="setServer('EU2')" style="flex:none;padding:6px 10px;font-size:.73rem;">EU2</div>
-    </div>
+    <button id="srvUS2" onclick="setServer('US2')" style="flex:1;padding:6px;border-radius:6px;font-size:.76rem;font-weight:700;cursor:pointer;border:2px solid #0070F2;background:rgba(0,112,242,0.2);color:#E8F4FF;">US2</button>
+    <button id="srvEU2" onclick="setServer('EU2')" style="flex:1;padding:6px;border-radius:6px;font-size:.76rem;font-weight:700;cursor:pointer;border:1px solid rgba(27,144,255,0.25);background:rgba(0,0,0,.2);color:#6B8FAF;">EU2</button>
   </div>
 
   <!-- Paste Zone -->
@@ -470,24 +470,24 @@ function setLOB(l, locked) {
 }
 
 // ── Server ──
-function setServer(s, locked) {
+function setServer(s) {
   currentServer = s;
-  document.getElementById('srvUS2').classList.toggle('active', s === 'US2');
-  document.getElementById('srvEU2').classList.toggle('active', s === 'EU2');
-  if (locked) {
-    document.getElementById('srvUS2').onclick = null;
-    document.getElementById('srvEU2').onclick = null;
-    document.getElementById('srvUS2').style.opacity = s === 'US2' ? '1' : '0.4';
-    document.getElementById('srvUS2').style.pointerEvents = s === 'US2' ? '' : 'none';
-    document.getElementById('srvEU2').style.opacity = s === 'EU2' ? '1' : '0.4';
-    document.getElementById('srvEU2').style.pointerEvents = s === 'EU2' ? '' : 'none';
+  const us2 = document.getElementById('srvUS2');
+  const eu2 = document.getElementById('srvEU2');
+  if (s === 'US2') {
+    us2.style.border = '2px solid #0070F2';
+    us2.style.background = 'rgba(0,112,242,0.2)';
+    us2.style.color = '#E8F4FF';
+    eu2.style.border = '1px solid rgba(27,144,255,0.25)';
+    eu2.style.background = 'rgba(0,0,0,.2)';
+    eu2.style.color = '#6B8FAF';
   } else {
-    document.getElementById('srvUS2').onclick = () => setServer('US2');
-    document.getElementById('srvEU2').onclick = () => setServer('EU2');
-    document.getElementById('srvUS2').style.opacity = '';
-    document.getElementById('srvUS2').style.pointerEvents = '';
-    document.getElementById('srvEU2').style.opacity = '';
-    document.getElementById('srvEU2').style.pointerEvents = '';
+    eu2.style.border = '2px solid #0070F2';
+    eu2.style.background = 'rgba(0,112,242,0.2)';
+    eu2.style.color = '#E8F4FF';
+    us2.style.border = '1px solid rgba(27,144,255,0.25)';
+    us2.style.background = 'rgba(0,0,0,.2)';
+    us2.style.color = '#6B8FAF';
   }
   saveState();
 }
@@ -501,7 +501,6 @@ function timerStart() {
   document.getElementById('timerStartBtn').style.display = 'none';
   document.getElementById('timerResetBtn').style.display = '';
   setLOB(lob, true);
-  setServer(currentServer, true);
   timerInterval = setInterval(tickTimer, 1000);
   saveState();
 }
@@ -549,7 +548,6 @@ function timerReset() {
   document.getElementById('timerStartBtn').style.display = '';
   document.getElementById('downtimeReasonWrap').style.display = 'none';
   setLOB(lob, false);
-  setServer(currentServer, false);
   clearFields();
   resetPasteZone();
   saveState();
@@ -767,7 +765,7 @@ function fillFields(p) {
   // Auto-detect server from URL in screenshot
   if (p.server) {
     const detected = p.server.toUpperCase(); // e.g. "US2", "EU2"
-    setServer(detected, false);
+    setServer(detected);
     showOCRStatus('', ''); // updated below
   }
 
@@ -1063,11 +1061,7 @@ function restoreState() {
     if (casesLbl) casesLbl.textContent = s.lob === 'IA' ? 'Reports' : 'Batches';
   }
   // Restore server
-  if (s.currentServer) {
-    currentServer = s.currentServer;
-    document.getElementById('srvUS2').classList.toggle('active', s.currentServer === 'US2');
-    document.getElementById('srvEU2').classList.toggle('active', s.currentServer === 'EU2');
-  }
+  if (s.currentServer) setServer(s.currentServer);
   // Restore fields
   if (s.fieldId)      { const el = document.getElementById('fieldId');      if (el) { el.value = s.fieldId;      el.classList.add('ocr-filled'); } }
   if (s.fieldEntity)  { const el = document.getElementById('fieldEntity');  if (el) { el.value = s.fieldEntity;  el.classList.add('ocr-filled'); } }
@@ -1090,14 +1084,6 @@ function restoreState() {
     document.getElementById('lobIA').style.pointerEvents = s.lob === 'IA' ? '' : 'none';
     document.getElementById('lobIC').style.opacity = s.lob === 'IC' ? '1' : '0.4';
     document.getElementById('lobIC').style.pointerEvents = s.lob === 'IC' ? '' : 'none';
-    // Lock server tabs too
-    const srv = s.currentServer || 'US2';
-    document.getElementById('srvUS2').onclick = null;
-    document.getElementById('srvEU2').onclick = null;
-    document.getElementById('srvUS2').style.opacity = srv === 'US2' ? '1' : '0.4';
-    document.getElementById('srvUS2').style.pointerEvents = srv === 'US2' ? '' : 'none';
-    document.getElementById('srvEU2').style.opacity = srv === 'EU2' ? '1' : '0.4';
-    document.getElementById('srvEU2').style.pointerEvents = srv === 'EU2' ? '' : 'none';
     timerInterval = setInterval(tickTimer, 1000);
   }
 }
