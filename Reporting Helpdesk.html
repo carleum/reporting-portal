@@ -4547,7 +4547,13 @@ function atLaunch() {
     localStorage.setItem(AT_POPUP_KEY + '_resume', '1');
   }
   const url = window.location.origin + window.location.pathname.replace('index.html','') + 'tracker-popup.html?v=' + Date.now();
-  atPopupWindow = window.open(url, 'atTracker', 'width=400,height=580,resizable=yes,scrollbars=no');
+  // If popup already open, navigate it to the new URL to force a fresh load
+  if (atPopupWindow && !atPopupWindow.closed) {
+    atPopupWindow.location.href = url;
+    atPopupWindow.focus();
+  } else {
+    atPopupWindow = window.open(url, 'atTracker', 'width=400,height=580,resizable=yes,scrollbars=no');
+  }
   if (!atPopupWindow) { showToast('⚠ Popup blocked — allow popups for this site', '#E9730C'); return; }
   atUpdateBadge();
   atStartPoll();
