@@ -98,9 +98,14 @@
   <div class="timer-block">
     <div class="timer-display" id="timerDisplay">00:00:00</div>
     <div class="timer-sub" id="timerSub">Waiting for screenshot paste</div>
+    <div class="btn-row" style="margin-top:8px;">
+      <button class="btn btn-secondary" id="timerStartBtn" onclick="showDowntimeReasonPicker()" style="font-size:.72rem;">▶ Start Timer (Downtime)</button>
+      <button class="btn btn-danger" id="timerResetBtn" onclick="timerReset()" style="display:none;">↺ Reset</button>
+    </div>
+  </div>
 
-    <!-- Downtime reason picker (shown after clicking Start Timer) -->
-    <div id="downtimeReasonWrap" style="display:none;margin-top:8px;background:rgba(0,112,242,0.06);border:1px solid var(--border);border-radius:8px;padding:10px;">
+  <!-- Downtime reason picker (shown after clicking Start Timer, outside timer block so it doesn't push content off screen) -->
+  <div id="downtimeReasonWrap" style="display:none;margin-bottom:10px;background:rgba(0,112,242,0.06);border:1px solid var(--border);border-radius:8px;padding:10px;">
 
       <!-- Server toggle -->
       <div style="font-size:.66rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;">Server</div>
@@ -156,12 +161,6 @@
           <option>RnR Activity</option>
         </optgroup>
       </select>
-    </div>
-
-    <div class="btn-row" style="margin-top:8px;">
-      <button class="btn btn-secondary" id="timerStartBtn" onclick="showDowntimeReasonPicker()" style="font-size:.72rem;">▶ Start Timer (Downtime)</button>
-      <button class="btn btn-danger" id="timerResetBtn" onclick="timerReset()" style="display:none;">↺ Reset</button>
-    </div>
   </div>
 
   <!-- Fields -->
