@@ -100,8 +100,17 @@
     <div class="timer-sub" id="timerSub">Waiting for screenshot paste</div>
 
     <!-- Downtime reason picker (shown after clicking Start Timer) -->
-    <div id="downtimeReasonWrap" style="display:none;margin-top:8px;">
-      <div style="font-size:.66rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Select downtime reason</div>
+    <div id="downtimeReasonWrap" style="display:none;margin-top:8px;background:rgba(0,112,242,0.06);border:1px solid var(--border);border-radius:8px;padding:10px;">
+
+      <!-- Server toggle -->
+      <div style="font-size:.66rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;">Server</div>
+      <div style="display:flex;gap:6px;margin-bottom:10px;">
+        <button id="dtSrvUS2" onclick="setDowntimeServer('US2')" style="flex:1;padding:6px;border-radius:6px;font-size:.76rem;font-weight:700;cursor:pointer;border:2px solid #0070F2;background:rgba(0,112,242,0.2);color:#E8F4FF;">US2</button>
+        <button id="dtSrvEU2" onclick="setDowntimeServer('EU2')" style="flex:1;padding:6px;border-radius:6px;font-size:.76rem;font-weight:700;cursor:pointer;border:1px solid rgba(27,144,255,0.25);background:rgba(0,0,0,.2);color:#6B8FAF;">EU2</button>
+      </div>
+
+      <!-- Reason dropdown -->
+      <div style="font-size:.66rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Reason</div>
       <select id="downtimeReason" class="exc-select" onchange="onDowntimeReasonPick()">
         <option value="">— Pick a reason to start —</option>
         <optgroup label="No Work">
@@ -482,24 +491,38 @@ function timerStart() {
   saveState();
 }
 
+function setDowntimeServer(s) {
+  currentServer = s;
+  const us2 = document.getElementById('dtSrvUS2');
+  const eu2 = document.getElementById('dtSrvEU2');
+  if (s === 'US2') {
+    us2.style.border = '2px solid #0070F2'; us2.style.background = 'rgba(0,112,242,0.2)'; us2.style.color = '#E8F4FF';
+    eu2.style.border = '1px solid rgba(27,144,255,0.25)'; eu2.style.background = 'rgba(0,0,0,.2)'; eu2.style.color = '#6B8FAF';
+  } else {
+    eu2.style.border = '2px solid #0070F2'; eu2.style.background = 'rgba(0,112,242,0.2)'; eu2.style.color = '#E8F4FF';
+    us2.style.border = '1px solid rgba(27,144,255,0.25)'; us2.style.background = 'rgba(0,0,0,.2)'; us2.style.color = '#6B8FAF';
+  }
+}
+
 function showDowntimeReasonPicker() {
   const wrap = document.getElementById('downtimeReasonWrap');
   wrap.style.display = '';
   document.getElementById('downtimeReason').value = '';
+  // Reset server toggle to currentServer (default US2)
+  setDowntimeServer(currentServer || 'US2');
   document.getElementById('downtimeReason').focus();
 }
 
 function onDowntimeReasonPick() {
   const reason = document.getElementById('downtimeReason').value;
   if (!reason) return;
-  // Hide the picker and start the timer
   document.getElementById('downtimeReasonWrap').style.display = 'none';
   timerStart();
-  document.getElementById('timerSub').textContent = '⏱ ' + reason;
-  // Pre-fill the exception panel with this reason so filing is one click
+  document.getElementById('timerSub').textContent = '⏱ ' + reason + ' · ' + currentServer;
+  // Pre-fill exception panel
   document.getElementById('excType').value = reason;
   onExcTypeChange();
-  showToast('⏱ ' + reason, '#E9730C');
+  showToast('⏱ ' + reason + ' · ' + currentServer, '#E9730C');
 }
 
 function timerStartManual() {
