@@ -6755,23 +6755,24 @@ function scPdScore(avgDays) {
 }
 
 function scFinalScore(kpis) {
-  // Exclude waived KPIs from weighted average — they don't count for or against
-  const active = kpis.filter(k => !k.waived);
-  if (!active.length) return { pct:0, rating:'—', badge:'sc-badge-below', label:'No Data', hasWaiver: kpis.some(k=>k.waived) };
+  // Exclude waived and blank-excluded KPIs from weighted average
+  const active = kpis.filter(k => !k.waived && !k.excluded);
+  if (!active.length) return { pct:0, rating:'—', badge:'sc-badge-below', label:'No Data', hasWaiver: kpis.some(k=>k.waived), hasCap: kpis.some(k=>k.cap||k.waived) };
   const ws  = active.reduce((s,k) => s + k.score * k.weight, 0);
   const wm  = active.reduce((s,k) => s + 5 * k.weight, 0);
   const pct = ws / wm * 100;
   const hasWaiver = kpis.some(k => k.waived);
-  // Cap rating at 4.00 if any KPI is waived (ceiling only — doesn't lift a low score)
+  const hasCap    = kpis.some(k => k.cap || k.waived);
+  // Cap at 4.00 if any KPI is waived OR any blank-cap KPI is excluded
   const rawRat = ws / wm * 5;
-  const rat = hasWaiver ? Math.min(rawRat, 4.00).toFixed(2) : rawRat.toFixed(2);
-  const cappedPct = hasWaiver ? Math.min(pct, 80) : pct;
+  const rat = hasCap ? Math.min(rawRat, 4.00).toFixed(2) : rawRat.toFixed(2);
+  const cappedPct = hasCap ? Math.min(pct, 80) : pct;
   let badge, label;
-  if (pct >= 90 && !hasWaiver) { badge='sc-badge-exceptional'; label='Exceptional'; }
-  else if (pct >= 70)          { badge='sc-badge-meets';       label='Meets Expectations'; }
-  else if (pct >= 50)          { badge='sc-badge-partial';     label='Meets Partial'; }
-  else                         { badge='sc-badge-below';       label='Below Expectations'; }
-  return { pct: Math.round(cappedPct), rating: rat, badge, label, hasWaiver };
+  if (pct >= 90 && !hasCap) { badge='sc-badge-exceptional'; label='Exceptional'; }
+  else if (pct >= 70)       { badge='sc-badge-meets';       label='Meets Expectations'; }
+  else if (pct >= 50)       { badge='sc-badge-partial';     label='Meets Partial'; }
+  else                      { badge='sc-badge-below';       label='Below Expectations'; }
+  return { pct: Math.round(cappedPct), rating: rat, badge, label, hasWaiver, hasCap };
 }
 
 function renderScorecard(agentEmail, agentName, monthVal, year, mon, assignedTaskIds) {
@@ -6829,6 +6830,34 @@ function renderScorecard(agentEmail, agentName, monthVal, year, mon, assignedTas
   // ── Report Deliverables ──
   const rdResult = scCalcRD(agentEmail, agentName, assignedTaskIds, year, mon);
 
+  // ── Smart KPI blank/exclusion logic ──
+  // Determine data availability for each KPI
+  const hasTasksAssigned  = assignedTaskIds.length > 0;
+  const hasTicketsAssigned = scTicketData.length > 0;
+  const hasProjects        = scProjectData.length > 0;
+  const hasEscalationData  = true; // RA always has a value (0 hits = 5/5)
+
+  // RD: 0 if has tasks but blank; excluded+cap4 if no tasks assigned
+  const rdBlankExclude = !hasTasksAssigned && rdResult.score === 0;
+  // RA: always has data (0 escalations = 5/5), no blank case
+  const raBlankExclude = false;
+  // PD/PQ: excluded+cap4 if no projects
+  const pdBlankExclude = !hasProjects || pdKpi.score === 0 && completedProjs.length === 0;
+  const pqBlankExclude = !hasProjects || (pqRatings.length === 0);
+  // TAT/TA: 0 if had tickets assigned but 0 closed; excluded (no cap) if 0 tickets assigned
+  const tatBlankExclude = !hasTicketsAssigned;
+  const taBlankExclude  = !hasTicketsAssigned;
+
+  // Build KPI status labels for visual
+  const kpiStatus = {
+    RD:  rdBlankExclude ? 'excluded-cap' : (rdResult.score === 0 && hasTasksAssigned ? 'zero' : 'scored'),
+    RA:  'scored',
+    PD:  pdBlankExclude ? 'excluded-cap' : 'scored',
+    PQ:  pqBlankExclude ? 'excluded-cap' : 'scored',
+    TAT: tatBlankExclude ? 'excluded-nocap' : (tatKpi.score === 0 && hasTicketsAssigned ? 'zero' : 'scored'),
+    TA:  taBlankExclude  ? 'excluded-nocap' : (taKpi.score  === 0 && hasTicketsAssigned ? 'zero' : 'scored'),
+  };
+
   // ── Apply waivers — override score to 0 if waived ──
   const isMonthWaived = scIsWaived('ALL');
   const wRD  = isMonthWaived || scIsWaived('RD');
@@ -6838,14 +6867,18 @@ function renderScorecard(agentEmail, agentName, monthVal, year, mon, assignedTas
   const wTAT = isMonthWaived || scIsWaived('TAT');
   const wTA  = isMonthWaived || scIsWaived('TA');
 
+  // Determine if excluded KPIs trigger the 4.00 cap
+  const blankCapTriggers = [rdBlankExclude, pdBlankExclude, pqBlankExclude].filter(Boolean).length;
+  const hasBlankCap = blankCapTriggers > 0;
+
   // ── Final ──
   const kpis = [
-    { score: wRD  ? 0 : rdResult.score,                         weight: 0.2, waived: !!wRD  },
-    { score: wRA  ? 0 : raScore,                                weight: 0.2, waived: !!wRA  },
-    { score: wPD  ? 0 : pdKpi.score,                           weight: 0.2, waived: !!wPD  },
-    { score: wPQ  ? 0 : (pqScore > 0 ? Math.round(pqScore):0), weight: 0.2, waived: !!wPQ  },
-    { score: wTAT ? 0 : tatKpi.score,                          weight: 0.1, waived: !!wTAT },
-    { score: wTA  ? 0 : taKpi.score,                           weight: 0.1, waived: !!wTA  },
+    { score: wRD  ? 0 : rdBlankExclude  ? 0 : rdResult.score,                  weight: 0.2, waived: !!wRD,  excluded: !wRD  && rdBlankExclude,  cap: !wRD  && rdBlankExclude  },
+    { score: wRA  ? 0 : raScore,                                                weight: 0.2, waived: !!wRA,  excluded: false,                     cap: false                     },
+    { score: wPD  ? 0 : pdBlankExclude  ? 0 : pdKpi.score,                     weight: 0.2, waived: !!wPD,  excluded: !wPD  && pdBlankExclude,  cap: !wPD  && pdBlankExclude  },
+    { score: wPQ  ? 0 : pqBlankExclude  ? 0 : (pqScore>0?Math.round(pqScore):0), weight: 0.2, waived: !!wPQ, excluded: !wPQ  && pqBlankExclude,  cap: !wPQ  && pqBlankExclude  },
+    { score: wTAT ? 0 : tatBlankExclude ? 0 : tatKpi.score,                    weight: 0.1, waived: !!wTAT, excluded: !wTAT && tatBlankExclude, cap: false                     },
+    { score: wTA  ? 0 : taBlankExclude  ? 0 : taKpi.score,                     weight: 0.1, waived: !!wTA,  excluded: !wTA  && taBlankExclude,  cap: false                     },
   ];
   const final = scFinalScore(kpis);
   const scoreColor = final.pct >= 90 ? '#7ED47E' : final.pct >= 70 ? '#89D1FF' : final.pct >= 50 ? '#FFB57A' : '#FF9999';
@@ -6857,7 +6890,9 @@ function renderScorecard(agentEmail, agentName, monthVal, year, mon, assignedTas
         <div style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px;">${h(agentName)} — ${monthLabel}</div>
         <div class="sc-final-score" style="color:${scoreColor}">${final.rating}<span style="font-size:1.2rem;color:var(--muted);font-weight:400;">/5.00</span></div>
         <div class="sc-final-badge ${final.badge}">${final.label}</div>
-        ${final.hasWaiver ? `<div style="font-size:.68rem;color:#FFB57A;margin-top:4px;">⚠ Max 4.00 — one or more KPIs waived</div>` : ''}
+        ${final.hasWaiver && final.hasCap ? `<div style="font-size:.68rem;color:#FFB57A;margin-top:4px;">⚠ Max 4.00 — KPI waived + incomplete data</div>` :
+          final.hasWaiver ? `<div style="font-size:.68rem;color:#FFB57A;margin-top:4px;">⚠ Max 4.00 — one or more KPIs waived</div>` :
+          final.hasCap    ? `<div style="font-size:.68rem;color:#FFB57A;margin-top:4px;">⚠ Max 4.00 — one or more KPIs have no data yet</div>` : ''}
       </div>
       <div style="flex:1;">
         <div style="background:rgba(0,0,0,0.2);border-radius:8px;height:10px;overflow:hidden;margin-bottom:6px;">
@@ -6885,41 +6920,78 @@ function renderScorecard(agentEmail, agentName, monthVal, year, mon, assignedTas
     <!-- KPI Grid — hidden for reviewer/escalation roles -->
     ${(effectiveRole === 'owner' || effectiveRole === 'agent') ? `
     <div class="sc-kpi-grid">
-      <div class="sc-kpi ck1" style="${wRD?'opacity:.5;':''}">
-        <div class="sc-kpi-label">Report Deliverables ${wRD?'<span style="font-size:.62rem;color:#FFB57A;">⚠ Waived</span>':''}</div>
-        <div class="sc-kpi-score" style="color:${wRD?'#FFB57A':rdResult.score>=4?'#7ED47E':rdResult.score>=3?'#FFB57A':'#FF9999'}">${wRD?'—':rdResult.score||'—'}${!wRD&&rdResult.score?'/5':''}</div>
-        <div class="sc-kpi-sub">${wRD?'Waived':rdResult.label}</div>
+      <div class="sc-kpi ck1" style="${wRD||rdBlankExclude?'opacity:.6;':''}">
+        <div class="sc-kpi-label">Report Deliverables ${wRD?'<span style="font-size:.62rem;color:#FFB57A;">⚠ Waived</span>':rdBlankExclude?'<span style="font-size:.62rem;color:#6B8FAF;">⊘ No tasks</span>':''}</div>
+        <div class="sc-kpi-score" style="color:${wRD||rdBlankExclude?'#6B8FAF':rdResult.score>=4?'#7ED47E':rdResult.score>=3?'#FFB57A':'#FF9999'}">${wRD||rdBlankExclude?'—':rdResult.score||'—'}${!wRD&&!rdBlankExclude&&rdResult.score?'/5':''}</div>
+        <div class="sc-kpi-sub">${wRD?'Waived':rdBlankExclude?'Excluded — no tasks assigned':rdResult.label}</div>
         <div class="sc-kpi-weight">Weight 20%</div>
       </div>
-      <div class="sc-kpi ck2" style="${wRA?'opacity:.5;':''}">
+      <div class="sc-kpi ck2" style="${wRA?'opacity:.6;':''}">
         <div class="sc-kpi-label">Report Accuracy ${wRA?'<span style="font-size:.62rem;color:#FFB57A;">⚠ Waived</span>':''}</div>
-        <div class="sc-kpi-score" style="color:${wRA?'#FFB57A':raScore>=4?'#7ED47E':raScore>=3?'#FFB57A':'#FF9999'}">${wRA?'—':raScore+'/5'}</div>
+        <div class="sc-kpi-score" style="color:${wRA?'#6B8FAF':raScore>=4?'#7ED47E':raScore>=3?'#FFB57A':'#FF9999'}">${wRA?'—':raScore+'/5'}</div>
         <div class="sc-kpi-sub">${wRA?'Waived':raLabel}</div>
         <div class="sc-kpi-weight">Weight 20% · ${agentGroup||'No group'}</div>
       </div>
-      <div class="sc-kpi ck3" style="${wPD?'opacity:.5;':''}">
-        <div class="sc-kpi-label">Project Delivery ${wPD?'<span style="font-size:.62rem;color:#FFB57A;">⚠ Waived</span>':''}</div>
-        <div class="sc-kpi-score" style="color:${wPD?'#FFB57A':pdKpi.score>=4?'#7ED47E':pdKpi.score>=3?'#FFB57A':'#FF9999'}">${wPD?'—':pdKpi.score||'—'}${!wPD&&pdKpi.score?'/5':''}</div>
-        <div class="sc-kpi-sub">${wPD?'Waived':pdKpi.label}</div>
+      <div class="sc-kpi ck3" style="${wPD||pdBlankExclude?'opacity:.6;':''}">
+        <div class="sc-kpi-label">Project Delivery ${wPD?'<span style="font-size:.62rem;color:#FFB57A;">⚠ Waived</span>':pdBlankExclude?'<span style="font-size:.62rem;color:#6B8FAF;">⊘ No projects</span>':''}</div>
+        <div class="sc-kpi-score" style="color:${wPD||pdBlankExclude?'#6B8FAF':pdKpi.score>=4?'#7ED47E':pdKpi.score>=3?'#FFB57A':'#FF9999'}">${wPD||pdBlankExclude?'—':pdKpi.score||'—'}${!wPD&&!pdBlankExclude&&pdKpi.score?'/5':''}</div>
+        <div class="sc-kpi-sub">${wPD?'Waived':pdBlankExclude?'Excluded — no completed projects':pdKpi.label}</div>
         <div class="sc-kpi-weight">Weight 20% · ${completedProjs.length} completed</div>
       </div>
-      <div class="sc-kpi ck4" style="${wPQ?'opacity:.5;':''}">
-        <div class="sc-kpi-label">Project Quality ${wPQ?'<span style="font-size:.62rem;color:#FFB57A;">⚠ Waived</span>':''}</div>
-        <div class="sc-kpi-score" style="color:${wPQ?'#FFB57A':pqScore>=4?'#7ED47E':pqScore>=3?'#FFB57A':'#FF9999'}">${wPQ?'—':pqScore?pqScore.toFixed(1)+'/5':'—'}</div>
-        <div class="sc-kpi-sub">${wPQ?'Waived':pqRatings.length?pqScore.toFixed(1)+'/5 avg':'Not yet rated'}</div>
+      <div class="sc-kpi ck4" style="${wPQ||pqBlankExclude?'opacity:.6;':''}">
+        <div class="sc-kpi-label">Project Quality ${wPQ?'<span style="font-size:.62rem;color:#FFB57A;">⚠ Waived</span>':pqBlankExclude?'<span style="font-size:.62rem;color:#6B8FAF;">⊘ Not rated</span>':''}</div>
+        <div class="sc-kpi-score" style="color:${wPQ||pqBlankExclude?'#6B8FAF':pqScore>=4?'#7ED47E':pqScore>=3?'#FFB57A':'#FF9999'}">${wPQ||pqBlankExclude?'—':pqScore?pqScore.toFixed(1)+'/5':'—'}</div>
+        <div class="sc-kpi-sub">${wPQ?'Waived':pqBlankExclude?'Excluded — no project ratings':pqRatings.length?pqScore.toFixed(1)+'/5 avg':'Not yet rated'}</div>
         <div class="sc-kpi-weight">Weight 20%</div>
       </div>
-      <div class="sc-kpi ck5" style="${wTAT?'opacity:.5;':''}">
-        <div class="sc-kpi-label">Ticket TAT ${wTAT?'<span style="font-size:.62rem;color:#FFB57A;">⚠ Waived</span>':''}</div>
-        <div class="sc-kpi-score" style="color:${wTAT?'#FFB57A':tatKpi.score>=4?'#7ED47E':tatKpi.score>=3?'#FFB57A':'#FF9999'}">${wTAT?'—':tatKpi.score||'—'}${!wTAT&&tatKpi.score?'/5':''}</div>
-        <div class="sc-kpi-sub">${wTAT?'Waived':tatKpi.label}</div>
+      <div class="sc-kpi ck5" style="${wTAT||tatBlankExclude?'opacity:.6;':''}">
+        <div class="sc-kpi-label">Ticket TAT ${wTAT?'<span style="font-size:.62rem;color:#FFB57A;">⚠ Waived</span>':tatBlankExclude?'<span style="font-size:.62rem;color:#6B8FAF;">⊘ No tickets</span>':''}</div>
+        <div class="sc-kpi-score" style="color:${wTAT||tatBlankExclude?'#6B8FAF':tatKpi.score>=4?'#7ED47E':tatKpi.score>=3?'#FFB57A':'#FF9999'}">${wTAT||tatBlankExclude?'—':tatKpi.score||'—'}${!wTAT&&!tatBlankExclude&&tatKpi.score?'/5':''}</div>
+        <div class="sc-kpi-sub">${wTAT?'Waived':tatBlankExclude?'Excluded — no tickets assigned':tatKpi.label}</div>
         <div class="sc-kpi-weight">Weight 10% · ${closed.length} closed</div>
       </div>
-      <div class="sc-kpi ck6" style="${wTA?'opacity:.5;':''}">
-        <div class="sc-kpi-label">Ticket Accuracy ${wTA?'<span style="font-size:.62rem;color:#FFB57A;">⚠ Waived</span>':''}</div>
-        <div class="sc-kpi-score" style="color:${wTA?'#FFB57A':taKpi.score>=4?'#7ED47E':taKpi.score>=3?'#FFB57A':'#FF9999'}">${wTA?'—':taKpi.score||'—'}${!wTA&&taKpi.score?'/5':''}</div>
-        <div class="sc-kpi-sub">${wTA?'Waived':taKpi.label}</div>
+      <div class="sc-kpi ck6" style="${wTA||taBlankExclude?'opacity:.6;':''}">
+        <div class="sc-kpi-label">Ticket Accuracy ${wTA?'<span style="font-size:.62rem;color:#FFB57A;">⚠ Waived</span>':taBlankExclude?'<span style="font-size:.62rem;color:#6B8FAF;">⊘ No tickets</span>':''}</div>
+        <div class="sc-kpi-score" style="color:${wTA||taBlankExclude?'#6B8FAF':taKpi.score>=4?'#7ED47E':taKpi.score>=3?'#FFB57A':'#FF9999'}">${wTA||taBlankExclude?'—':taKpi.score||'—'}${!wTA&&!taBlankExclude&&taKpi.score?'/5':''}</div>
+        <div class="sc-kpi-sub">${wTA?'Waived':taBlankExclude?'Excluded — no tickets assigned':taKpi.label}</div>
         <div class="sc-kpi-weight">Weight 10%</div>
+      </div>
+    </div>
+
+    <!-- Scoring Logic Visual -->
+    <div style="margin:14px 0;background:rgba(0,0,0,0.2);border:1px solid rgba(27,144,255,0.2);border-radius:10px;padding:14px;">
+      <div style="font-size:.72rem;font-weight:700;color:var(--accent2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px;">📊 How Your Score is Calculated</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px;">
+        ${[
+          {label:'Report Deliverables',  status: wRD?'waived':rdBlankExclude?'excluded-cap':'scored', score: wRD||rdBlankExclude?null:rdResult.score, weight:'20%'},
+          {label:'Report Accuracy',      status: wRA?'waived':'scored',                              score: wRA?null:raScore,                           weight:'20%'},
+          {label:'Project Delivery',     status: wPD?'waived':pdBlankExclude?'excluded-cap':'scored', score: wPD||pdBlankExclude?null:pdKpi.score,       weight:'20%'},
+          {label:'Project Quality',      status: wPQ?'waived':pqBlankExclude?'excluded-cap':'scored', score: wPQ||pqBlankExclude?null:(pqScore?Math.round(pqScore):null), weight:'20%'},
+          {label:'Ticket TAT',           status: wTAT?'waived':tatBlankExclude?'excluded-nocap':'scored', score: wTAT||tatBlankExclude?null:tatKpi.score, weight:'10%'},
+          {label:'Ticket Accuracy',      status: wTA?'waived':taBlankExclude?'excluded-nocap':'scored',  score: wTA||taBlankExclude?null:taKpi.score,    weight:'10%'},
+        ].map(k => {
+          const color = k.status==='scored'?(k.score>=4?'#7ED47E':k.score>=3?'#FFB57A':'#FF9999'):'#6B8FAF';
+          const tag = k.status==='waived'?'<span style="background:rgba(233,115,12,0.2);color:#FFB57A;border-radius:3px;padding:1px 5px;font-size:.6rem;">WAIVED</span>':
+                      k.status==='excluded-cap'?'<span style="background:rgba(27,144,255,0.15);color:#6B8FAF;border-radius:3px;padding:1px 5px;font-size:.6rem;">EXCLUDED · caps 4.0</span>':
+                      k.status==='excluded-nocap'?'<span style="background:rgba(27,144,255,0.15);color:#6B8FAF;border-radius:3px;padding:1px 5px;font-size:.6rem;">EXCLUDED</span>':
+                      '<span style="background:rgba(0,112,242,0.15);color:#89D1FF;border-radius:3px;padding:1px 5px;font-size:.6rem;">SCORED · '+k.weight+'</span>';
+          return \`<div style="background:rgba(0,0,0,0.2);border-radius:6px;padding:8px 10px;border:1px solid rgba(27,144,255,0.15);">
+            <div style="font-size:.66rem;color:var(--muted);margin-bottom:4px;">\${k.label}</div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:1rem;font-weight:700;color:\${color};">\${k.score!=null?k.score+'/5':'—'}</span>
+              \${tag}
+            </div>
+          </div>\`;
+        }).join('')}
+      </div>
+      <div style="font-size:.7rem;color:var(--muted);border-top:1px solid rgba(27,144,255,0.15);padding-top:8px;display:flex;flex-wrap:wrap;gap:10px;">
+        <span>🟢 <b style="color:var(--text);">SCORED</b> — included in weighted average</span>
+        <span>🔵 <b style="color:var(--text);">EXCLUDED</b> — no data, not counted</span>
+        <span>🔵 <b style="color:var(--text);">EXCLUDED · caps 4.0</b> — no data, max score = 4.00</span>
+        <span>🟡 <b style="color:var(--text);">WAIVED</b> — TL approved, max score = 4.00</span>
+      </div>
+      <div style="font-size:.7rem;color:#89D1FF;margin-top:8px;">
+        💡 To reach <b>5.00</b> — all 6 KPIs must be scored with actual data. Missing any optional KPI caps your score at 4.00.
       </div>
     </div>
 
