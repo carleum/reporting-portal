@@ -7636,13 +7636,24 @@ function rkCalcAgentScore(agentEmail, agentName, agentGroup, data) {
   const raHits = groupEsc.length;
   const raScore = raHits === 0 ? 5 : raHits === 1 ? 3 : 1;
 
+  // ── Same blank/exclusion logic as scorecard ──
+  const hasTasksAssigned   = assignedTaskIds.length > 0;
+  const hasTicketsAssigned = myTickets.length > 0;
+  const hasProjects        = myProjects.length > 0;
+
+  const rdBlankExclude  = !hasTasksAssigned && rdScore === 0;
+  const pdBlankExclude  = !hasProjects || (completedP.length === 0 && avgPd === null);
+  const pqBlankExclude  = true; // PQ always excluded in rankings (no bulk ratings)
+  const tatBlankExclude = !hasTicketsAssigned;
+  const taBlankExclude  = !hasTicketsAssigned;
+
   const kpis = [
-    { score: rkIsWaived('RD')  ? 0 : rdScore,         weight: 0.2, waived: rkIsWaived('RD')  },
-    { score: rkIsWaived('RA')  ? 0 : raScore,         weight: 0.2, waived: rkIsWaived('RA')  },
-    { score: rkIsWaived('PD')  ? 0 : pdKpi.score,     weight: 0.2, waived: rkIsWaived('PD')  },
-    { score: rkIsWaived('PQ')  ? 0 : pqScore,         weight: 0.2, waived: rkIsWaived('PQ')  },
-    { score: rkIsWaived('TAT') ? 0 : tatKpi.score,    weight: 0.1, waived: rkIsWaived('TAT') },
-    { score: rkIsWaived('TA')  ? 0 : taKpi.score,     weight: 0.1, waived: rkIsWaived('TA')  },
+    { score: rkIsWaived('RD')  ? 0 : rdScore,      weight: 0.2, waived: rkIsWaived('RD'),  excluded: !rkIsWaived('RD')  && rdBlankExclude,  cap: !rkIsWaived('RD')  && rdBlankExclude  },
+    { score: rkIsWaived('RA')  ? 0 : raScore,       weight: 0.2, waived: rkIsWaived('RA'),  excluded: false,                                  cap: false                                  },
+    { score: rkIsWaived('PD')  ? 0 : pdKpi.score,   weight: 0.2, waived: rkIsWaived('PD'),  excluded: !rkIsWaived('PD')  && pdBlankExclude,  cap: !rkIsWaived('PD')  && pdBlankExclude  },
+    { score: rkIsWaived('PQ')  ? 0 : pqScore,       weight: 0.2, waived: rkIsWaived('PQ'),  excluded: !rkIsWaived('PQ')  && pqBlankExclude,  cap: !rkIsWaived('PQ')  && pqBlankExclude  },
+    { score: rkIsWaived('TAT') ? 0 : tatKpi.score,  weight: 0.1, waived: rkIsWaived('TAT'), excluded: !rkIsWaived('TAT') && tatBlankExclude, cap: false                                  },
+    { score: rkIsWaived('TA')  ? 0 : taKpi.score,   weight: 0.1, waived: rkIsWaived('TA'),  excluded: !rkIsWaived('TA')  && taBlankExclude,  cap: false                                  },
   ];
   return scFinalScore(kpis);
 }
