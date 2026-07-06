@@ -1978,6 +1978,8 @@ function setUser(name, email) {
     fetchUserGroup(email);
     setTimeout(handleDeepLink, 800);
     initChangelog();
+    // Load business hours config for SLA calculations
+    loadBizHours();
     // If Activity Tracker is open, reload data now that we have a token
     setTimeout(() => {
       if (document.getElementById('page-activity')?.classList.contains('active') && accessToken) {
@@ -2142,13 +2144,174 @@ function agentName(email) {
 }
 
 // ══════════════════════════════════════════════
+//  BUSINESS HOURS CONFIG
+// ══════════════════════════════════════════════
+let _bizSchedules = null; // null = not loaded yet
+
+async function loadBizHours() {
+  try {
+    const res  = await fetch(`${SP_SITE}/_api/web/lists/getbytitle('Portal%20Business%20Hours')/items?$select=Title,ShiftStart,ShiftEnd,Timezone,CrossesMidnight,WorkDays,Categories&$top=50`, spFetchOpts());
+    const data = await res.json();
+    _bizSchedules = {};
+    (data.d?.results || []).forEach(row => {
+      const cats = (row.Categories || '').split(',').map(c => c.trim()).filter(Boolean);
+      const schedule = {
+        title:          row.Title,
+        startH:         parseFloat((row.ShiftStart || '08:00').replace(':','.')),
+        startMin:       parseInt((row.ShiftStart || '08:00').split(':')[1] || '0'),
+        endH:           parseFloat((row.ShiftEnd   || '17:00').replace(':','.')),
+        endMin:         parseInt((row.ShiftEnd   || '17:00').split(':')[1] || '0'),
+        crossesMidnight: row.CrossesMidnight === true || row.CrossesMidnight === 'Yes',
+        workDays:       (row.WorkDays || '1,2,3,4,5').split(',').map(Number),
+        timezone:       row.Timezone || 'Asia/Manila',
+      };
+      // store start/end as fractional hours for arithmetic
+      schedule.startFrac = parseInt((row.ShiftStart||'08:00').split(':')[0]) + parseInt((row.ShiftStart||'08:00').split(':')[1]||0)/60;
+      schedule.endFrac   = parseInt((row.ShiftEnd  ||'17:00').split(':')[0]) + parseInt((row.ShiftEnd  ||'17:00').split(':')[1]||0)/60;
+      schedule.shiftHours = schedule.crossesMidnight
+        ? (24 - schedule.startFrac + schedule.endFrac)
+        : (schedule.endFrac - schedule.startFrac);
+      cats.forEach(cat => { _bizSchedules[cat] = schedule; });
+    });
+  } catch(e) {
+    console.warn('[BizHours] Failed to load Portal Business Hours — using linear fallback', e);
+    _bizSchedules = {};
+  }
+}
+
+function getBizSchedule(category) {
+  if (!_bizSchedules) return null;
+  return _bizSchedules[category] || null;
+}
+
+// Convert a UTC Date to fractional local hour in the schedule's timezone (PHT = UTC+8)
+function toLocalFracHour(date, tz) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric', minute: 'numeric', hour12: false, timeZone: tz
+  }).formatToParts(date);
+  const h = parseInt(parts.find(p => p.type === 'hour')?.value || 0);
+  const m = parseInt(parts.find(p => p.type === 'minute')?.value || 0);
+  return h + m / 60;
+}
+
+function toLocalDayOfWeek(date, tz) {
+  return parseInt(new Intl.DateTimeFormat('en-US', {
+    weekday: 'short', timeZone: tz
+  }).formatToParts(date).find(p => p.type === 'weekday')
+    ? new Date(date.toLocaleString('en-US', { timeZone: tz })).getDay()
+    : date.getDay());
+}
+
+function isWorkDay(date, schedule) {
+  const dow = new Date(date.toLocaleString('en-US', { timeZone: schedule.timezone })).getDay();
+  return schedule.workDays.includes(dow);
+}
+
+// Add `hours` business hours to `start` date using the given schedule
+function addBusinessHours(start, hours, schedule) {
+  if (!schedule) return new Date(start.getTime() + hours * 3600000);
+
+  let remaining = hours;
+  let cursor    = new Date(start.getTime());
+  const MS_MIN  = 60000;
+  const tz      = schedule.timezone;
+
+  // Advance cursor to next business moment if currently outside shift
+  cursor = advanceToShiftStart(cursor, schedule);
+
+  while (remaining > 0) {
+    if (!isWorkDay(cursor, schedule)) {
+      // skip to next day shift start
+      cursor = nextDayShiftStart(cursor, schedule);
+      continue;
+    }
+    const localH = toLocalFracHour(cursor, tz);
+    let minutesLeftInShift;
+    if (schedule.crossesMidnight) {
+      // shift wraps midnight: start e.g. 21:00, end 06:00
+      if (localH >= schedule.startFrac || localH < schedule.endFrac) {
+        // inside shift
+        minutesLeftInShift = localH >= schedule.startFrac
+          ? (24 - localH + schedule.endFrac) * 60
+          : (schedule.endFrac - localH) * 60;
+      } else {
+        cursor = advanceToShiftStart(cursor, schedule);
+        continue;
+      }
+    } else {
+      if (localH >= schedule.startFrac && localH < schedule.endFrac) {
+        minutesLeftInShift = (schedule.endFrac - localH) * 60;
+      } else {
+        cursor = advanceToShiftStart(cursor, schedule);
+        continue;
+      }
+    }
+    const minutesNeeded = remaining * 60;
+    if (minutesNeeded <= minutesLeftInShift) {
+      cursor = new Date(cursor.getTime() + minutesNeeded * MS_MIN);
+      remaining = 0;
+    } else {
+      cursor    = new Date(cursor.getTime() + minutesLeftInShift * MS_MIN);
+      remaining -= minutesLeftInShift / 60;
+      cursor     = advanceToShiftStart(cursor, schedule);
+    }
+  }
+  return cursor;
+}
+
+function advanceToShiftStart(date, schedule) {
+  const tz     = schedule.timezone;
+  const localH = toLocalFracHour(date, tz);
+  if (schedule.crossesMidnight) {
+    if (localH >= schedule.startFrac || localH < schedule.endFrac) return date; // already in shift
+  } else {
+    if (localH >= schedule.startFrac && localH < schedule.endFrac) return date;
+  }
+  // Move to next shift start on a workday
+  return nextShiftStart(date, schedule);
+}
+
+function nextShiftStart(date, schedule) {
+  const tz      = schedule.timezone;
+  const localStr = date.toLocaleString('en-US', { timeZone: tz });
+  const local    = new Date(localStr);
+  // Set to shift start today
+  local.setHours(Math.floor(schedule.startFrac), Math.round((schedule.startFrac % 1) * 60), 0, 0);
+  // Convert back to UTC offset
+  const todayStart = new Date(local.toLocaleString('en-US') + ' UTC');
+  const diff       = date.getTime() - new Date(date.toLocaleString('en-US', { timeZone: tz })).getTime();
+  let candidate    = new Date(local.getTime() - diff);
+  // If shift start today is in the past, move to next day
+  if (candidate <= date) candidate = new Date(candidate.getTime() + 86400000);
+  // Skip non-work days
+  let tries = 0;
+  while (!isWorkDay(candidate, schedule) && tries++ < 7) {
+    candidate = new Date(candidate.getTime() + 86400000);
+  }
+  return candidate;
+}
+
+function nextDayShiftStart(date, schedule) {
+  return nextShiftStart(new Date(date.getTime() + 86400000), schedule);
+}
+
+// Add `days` business days to `start`
+function addBusinessDays(start, days, schedule) {
+  if (!schedule) return new Date(start.getTime() + days * 86400000);
+  const hoursPerDay = schedule.shiftHours || 8;
+  return addBusinessHours(start, days * hoursPerDay, schedule);
+}
+
+// ══════════════════════════════════════════════
 //  SLA HELPERS
 // ══════════════════════════════════════════════
-function slaDeadline(createdISO, priority) {
-  const created = new Date(createdISO);
-  const hours   = SLA_HOURS[priority] || 24;
-  return new Date(created.getTime() + hours * 3600000);
+function slaDeadline(createdISO, priority, category) {
+  const created  = new Date(createdISO);
+  const hours    = SLA_HOURS[priority] || 24;
+  const schedule = getBizSchedule(category);
+  return addBusinessHours(created, hours, schedule);
 }
+
 
 // Parse total milliseconds spent in Pending from comments thread
 function slaPendedMs(comments) {
@@ -2196,13 +2359,15 @@ function slaLabel(ticket) {
     return `<span class="sla-warn">⏸ Pending</span>`;
   }
   const pausedMs  = slaPendedMs(ticket.Comments);
-  const deadline  = slaDeadline(ticket.Created, ticket.Priority);
+  const deadline  = slaDeadline(ticket.Created, ticket.Priority, ticket.Category);
   const now       = new Date();
   const diffH     = (deadline - now + pausedMs) / 3600000;
-  if (diffH < 0)  return `<span class="sla-breach">⚠ Breached</span>`;
-  if (diffH < 4)  return `<span class="sla-warn">⏱ ${Math.round(diffH)}h left</span>`;
-  const diffD     = diffH / 8;
-  if (diffD < 1)  return `<span class="sla-warn">${Math.round(diffH)}h left</span>`;
+  const schedule  = getBizSchedule(ticket.Category);
+  const dayHours  = schedule?.shiftHours || 8;
+  if (diffH < 0)         return `<span class="sla-breach">⚠ Breached</span>`;
+  if (diffH < 4)         return `<span class="sla-warn">⏱ ${Math.round(diffH)}h left</span>`;
+  const diffD = diffH / dayHours;
+  if (diffD < 1)         return `<span class="sla-warn">${Math.round(diffH)}h left</span>`;
   return `<span class="sla-ok">${diffD.toFixed(1)}d left</span>`;
 }
 
@@ -2738,7 +2903,7 @@ function updateKPIs() {
   document.getElementById('kResolved').textContent = t.filter(x=>['Resolved','Closed'].includes(x.Status)).length;
   const breached = t.filter(x => {
     if (['Resolved','Closed'].includes(x.Status)) return false;
-    return new Date() > slaDeadline(x.Created, x.Priority);
+    return new Date() > slaDeadline(x.Created, x.Priority, x.Category);
   }).length;
   document.getElementById('kBreached').textContent = breached;
 }
@@ -3687,11 +3852,13 @@ function refreshAdminQueue() {
 function projectSlaLabel(p) {
   if (p.Status === 'Live') return `<span class="sla-ok">✓ Live</span>`;
   if (!p.StartDate || !p.Priority) return `<span class="sla-ok">—</span>`;
-  const target = PROJECT_SLA_DAYS[p.Priority] || 30;
-  // Use LaunchDate if set, otherwise calculate from StartDate + target days
-  const effectiveLaunch = p.LaunchDate ? new Date(p.LaunchDate) : new Date(new Date(p.StartDate).getTime() + target * 86400000);
-  const now = new Date();
-  const diffD = (effectiveLaunch - now) / 86400000;
+  const target   = PROJECT_SLA_DAYS[p.Priority] || 30;
+  const schedule = getBizSchedule(p.SubCategory);
+  const deadline = p.LaunchDate
+    ? new Date(p.LaunchDate)
+    : addBusinessDays(new Date(p.StartDate), target, schedule);
+  const now  = new Date();
+  const diffD = (deadline - now) / 86400000;
   if (diffD < 0)  return `<span class="sla-breach">⚠ Breached</span>`;
   if (diffD < 3)  return `<span class="sla-warn">⏱ ${diffD.toFixed(1)}d left</span>`;
   return `<span class="sla-ok">${diffD.toFixed(1)}d left</span>`;
