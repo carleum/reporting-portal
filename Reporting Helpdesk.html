@@ -6614,11 +6614,21 @@ function scCalcRD(agentEmail, agentName, assignedTaskIds, year, mon) {
       : (task.Created ? new Date(task.Created) : null);
     if (assignedDate) assignedDate.setHours(0,0,0,0);
 
+    const isUSD = task.Tab === 'USD Task';
+    // For USD tasks, a day isn't "missed" until 9pm PHT the following day has passed
+    // 9pm PHT = 13:00 UTC, so cutoff for day d = new Date(d+1 at 13:00 UTC)
+    const missDeadline = (dateObj) => {
+      if (!isUSD) return dateObj < today; // Non-USD: missed once day ends at midnight
+      const next = new Date(dateObj.getTime() + 86400000); // d+1
+      next.setUTCHours(13, 0, 0, 0); // 9pm PHT = 13:00 UTC
+      return new Date() > next;
+    };
+
     if (task.Frequency === 'Daily') {
       let taskDays = 0;
       for (let d = 1; d <= lastDay; d++) {
         const dateObj = new Date(year, mon-1, d);
-        if (dateObj >= today) continue; // only count fully completed days
+        if (!missDeadline(dateObj)) continue; // only count days whose logging window has closed
         const dow = dateObj.getDay();
         if (dow === 0 || dow === 6) continue;
         if (assignedDate && dateObj < assignedDate) continue;
