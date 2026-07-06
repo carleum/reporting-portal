@@ -2320,11 +2320,14 @@ function slaLabel(ticket) {
   const schedule  = getBizSchedule(ticket.Category);
   const remainBizH = countBusinessHours(now, new Date(deadline.getTime() + pausedMs), schedule);
   const dayHours   = schedule?.shiftHours || 9;
-  if (remainBizH < 0)      return `<span class="sla-breach">⚠ Breached</span>`;
-  if (remainBizH < 4)      return `<span class="sla-warn">⏱ ${Math.round(remainBizH)}h left</span>`;
-  const diffD = remainBizH / dayHours;
-  if (diffD < 1)           return `<span class="sla-warn">${Math.round(remainBizH)}h left</span>`;
-  return `<span class="sla-ok">${diffD.toFixed(1)}d left</span>`;
+  if (remainBizH < 0)  return `<span class="sla-breach">⚠ Breached</span>`;
+  if (remainBizH < 1)  return `<span class="sla-warn">⏱ ${Math.round(remainBizH * 60)}m left</span>`;
+  if (remainBizH < 4)  return `<span class="sla-warn">⏱ ${remainBizH.toFixed(1)} biz hrs left</span>`;
+  const bizDays  = Math.floor(remainBizH / dayHours);
+  const bizHours = Math.round(remainBizH % dayHours);
+  if (bizDays === 0)   return `<span class="sla-warn">${bizHours} biz hrs left</span>`;
+  if (bizHours === 0)  return `<span class="sla-ok">${bizDays} biz day${bizDays > 1 ? 's' : ''} left</span>`;
+  return `<span class="sla-ok">${bizDays} biz day${bizDays > 1 ? 's' : ''} ${bizHours}h left</span>`;
   } catch(e) { console.error('[slaLabel]', e, ticket); return `<span class="sla-warn">—</span>`; }
 }
 
