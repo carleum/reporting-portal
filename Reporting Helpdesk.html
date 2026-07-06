@@ -6975,13 +6975,12 @@ function renderScorecard(agentEmail, agentName, monthVal, year, mon, assignedTas
                       k.status==='excluded-cap'?'<span style="background:rgba(27,144,255,0.15);color:#6B8FAF;border-radius:3px;padding:1px 5px;font-size:.6rem;">EXCLUDED · caps 4.0</span>':
                       k.status==='excluded-nocap'?'<span style="background:rgba(27,144,255,0.15);color:#6B8FAF;border-radius:3px;padding:1px 5px;font-size:.6rem;">EXCLUDED</span>':
                       '<span style="background:rgba(0,112,242,0.15);color:#89D1FF;border-radius:3px;padding:1px 5px;font-size:.6rem;">SCORED · '+k.weight+'</span>';
-          return \`<div style="background:rgba(0,0,0,0.2);border-radius:6px;padding:8px 10px;border:1px solid rgba(27,144,255,0.15);">
-            <div style="font-size:.66rem;color:var(--muted);margin-bottom:4px;">\${k.label}</div>
-            <div style="display:flex;align-items:center;gap:6px;">
-              <span style="font-size:1rem;font-weight:700;color:\${color};">\${k.score!=null?k.score+'/5':'—'}</span>
-              \${tag}
-            </div>
-          </div>\`;
+          return '<div style="background:rgba(0,0,0,0.2);border-radius:6px;padding:8px 10px;border:1px solid rgba(27,144,255,0.15);">'
+            + '<div style="font-size:.66rem;color:var(--muted);margin-bottom:4px;">'+k.label+'</div>'
+            + '<div style="display:flex;align-items:center;gap:6px;">'
+            + '<span style="font-size:1rem;font-weight:700;color:'+color+';">'+(k.score!=null?k.score+'/5':'—')+'</span>'
+            + tag
+            + '</div></div>';
         }).join('')}
       </div>
       <div style="font-size:.7rem;color:var(--muted);border-top:1px solid rgba(27,144,255,0.15);padding-top:8px;display:flex;flex-wrap:wrap;gap:10px;">
