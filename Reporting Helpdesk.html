@@ -2187,38 +2187,61 @@ function getBizSchedule(category) {
   return _bizSchedules[category] || null;
 }
 
-// Add `hours` business hours to `start` date using the given schedule
-// Steps forward in 15-min increments, skipping non-work periods. Cap at 10000 steps.
-// Uses UTC+8 offset directly (PHT) — avoids browser timezone name compatibility issues.
+// Add `hours` business hours to `start` date — fast day-skipping version
 function addBusinessHours(start, hours, schedule) {
   if (!schedule) return new Date(start.getTime() + hours * 3600000);
+  const UTC8 = 8 * 3600000;
+  let cursor    = new Date(start.getTime());
+  let remaining = hours;
 
-  const STEP_MS  = 15 * 60000; // 15-minute steps
-  const STEP_H   = 0.25;
-  const UTC_OFFSET_MS = 8 * 3600000; // PHT = UTC+8
-  let cursor     = new Date(start.getTime());
-  let remaining  = hours;
-  let safety     = 0;
-
-  while (remaining > 0 && safety++ < 10000) {
-    // Get local PHT time via UTC+8 offset
-    const localMs  = cursor.getTime() + UTC_OFFSET_MS;
+  while (remaining > 0) {
+    const localMs   = cursor.getTime() + UTC8;
     const localDate = new Date(localMs);
     const dow   = localDate.getUTCDay();
+
+    // Skip whole weekend days
+    if (dow === 0 || dow === 6) {
+      const nextMidnight = new Date(localMs);
+      nextMidnight.setUTCHours(24, 0, 0, 0);
+      cursor = new Date(nextMidnight.getTime() - UTC8);
+      continue;
+    }
+
     const fracH = localDate.getUTCHours() + localDate.getUTCMinutes() / 60;
 
-    const inWorkDay = schedule.workDays.includes(dow);
-    let inShift;
+    // Build shift start/end in UTC for today
+    const dayMidnightLocal = new Date(localMs);
+    dayMidnightLocal.setUTCHours(0, 0, 0, 0);
+
+    const shiftStartMs = new Date(dayMidnightLocal.getTime());
+    shiftStartMs.setUTCHours(Math.floor(schedule.startFrac), Math.round((schedule.startFrac % 1) * 60), 0, 0);
+    const shiftOnMs = shiftStartMs.getTime() - UTC8;
+
+    const shiftEndMs = new Date(dayMidnightLocal.getTime());
     if (schedule.crossesMidnight) {
-      inShift = fracH >= schedule.startFrac || fracH < schedule.endFrac;
+      shiftEndMs.setUTCHours(Math.floor(schedule.endFrac) + 24, Math.round((schedule.endFrac % 1) * 60), 0, 0);
     } else {
-      inShift = fracH >= schedule.startFrac && fracH < schedule.endFrac;
+      shiftEndMs.setUTCHours(Math.floor(schedule.endFrac), Math.round((schedule.endFrac % 1) * 60), 0, 0);
+    }
+    const shiftOffMs = shiftEndMs.getTime() - UTC8;
+
+    // If before shift start, jump to shift start
+    if (cursor.getTime() < shiftOnMs) { cursor = new Date(shiftOnMs); continue; }
+    // If at/after shift end, jump to tomorrow's shift start
+    if (cursor.getTime() >= shiftOffMs) {
+      const nextShiftStart = new Date(shiftOnMs + 86400000);
+      cursor = nextShiftStart; continue;
     }
 
-    if (inWorkDay && inShift) {
-      remaining -= STEP_H;
+    // Inside shift — how many hours left in this shift?
+    const hoursLeftInShift = (shiftOffMs - cursor.getTime()) / 3600000;
+    if (remaining <= hoursLeftInShift) {
+      cursor = new Date(cursor.getTime() + remaining * 3600000);
+      remaining = 0;
+    } else {
+      remaining -= hoursLeftInShift;
+      cursor = new Date(shiftOnMs + 86400000); // tomorrow's shift start
     }
-    cursor = new Date(cursor.getTime() + STEP_MS);
   }
   return cursor;
 }
@@ -2229,30 +2252,73 @@ function addBusinessDays(start, days, schedule) {
   return addBusinessHours(start, days * hoursPerDay, schedule);
 }
 
-// Count business hours between two dates
+// Count business hours between two dates — fast version using day-level skipping
 function countBusinessHours(from, to, schedule) {
   if (!schedule) return (to - from) / 3600000;
-  if (to <= from) return -countBusinessHours(to, from, schedule);
-  const STEP_MS = 15 * 60000;
-  const STEP_H  = 0.25;
-  const UTC_OFFSET_MS = 8 * 3600000;
-  let cursor  = new Date(from.getTime());
-  let total   = 0;
-  let safety  = 0;
-  while (cursor < to && safety++ < 20000) {
-    const localMs   = cursor.getTime() + UTC_OFFSET_MS;
+  if (to <= from) return -(countBusinessHours(to, from, schedule));
+  const UTC8 = 8 * 3600000;
+  let total = 0;
+  let cursor = new Date(from.getTime());
+
+  while (cursor < to) {
+    const localMs   = cursor.getTime() + UTC8;
     const localDate = new Date(localMs);
-    const dow  = localDate.getUTCDay();
+    const dow   = localDate.getUTCDay();
     const fracH = localDate.getUTCHours() + localDate.getUTCMinutes() / 60;
-    const inWorkDay = schedule.workDays.includes(dow);
-    let inShift;
-    if (schedule.crossesMidnight) {
-      inShift = fracH >= schedule.startFrac || fracH < schedule.endFrac;
-    } else {
-      inShift = fracH >= schedule.startFrac && fracH < schedule.endFrac;
+
+    // Skip whole weekend days in one jump
+    if (dow === 0 || dow === 6) {
+      // Jump to next midnight UTC+8 (= next day 00:00 PHT)
+      const nextMidnightLocal = new Date(localMs);
+      nextMidnightLocal.setUTCHours(24, 0, 0, 0);
+      cursor = new Date(nextMidnightLocal.getTime() - UTC8);
+      continue;
     }
-    if (inWorkDay && inShift) total += STEP_H;
-    cursor = new Date(cursor.getTime() + STEP_MS);
+
+    // On a work day — calculate shift bounds in UTC
+    const shiftStartUTC = new Date(localMs);
+    shiftStartUTC.setUTCHours(0, 0, 0, 0);
+    const shiftStartH = Math.floor(schedule.startFrac);
+    const shiftStartM = Math.round((schedule.startFrac % 1) * 60);
+    const shiftEndH   = Math.floor(schedule.endFrac);
+    const shiftEndM   = Math.round((schedule.endFrac % 1) * 60);
+
+    // Start of shift in UTC
+    const shiftOnUTC = new Date(shiftStartUTC.getTime());
+    shiftOnUTC.setUTCHours(shiftStartH, shiftStartM, 0, 0);
+    const shiftOnMs = shiftOnUTC.getTime() - UTC8;
+
+    // End of shift in UTC (handle crossesMidnight)
+    const shiftOffUTC = new Date(shiftStartUTC.getTime());
+    if (schedule.crossesMidnight) {
+      shiftOffUTC.setUTCHours(shiftEndH + 24, shiftEndM, 0, 0); // next day
+    } else {
+      shiftOffUTC.setUTCHours(shiftEndH, shiftEndM, 0, 0);
+    }
+    const shiftOffMs = shiftOffUTC.getTime() - UTC8;
+
+    const effectiveStart = Math.max(cursor.getTime(), shiftOnMs);
+    const effectiveEnd   = Math.min(to.getTime(), shiftOffMs);
+
+    if (effectiveEnd > effectiveStart) {
+      total += (effectiveEnd - effectiveStart) / 3600000;
+    }
+
+    // Jump to end of shift (or next day if already past shift)
+    const jumpTo = cursor.getTime() >= shiftOffMs
+      ? new Date(shiftOnMs + 86400000) // tomorrow's shift start
+      : new Date(shiftOffMs);
+    cursor = jumpTo > to ? to : jumpTo;
+    if (cursor.getTime() === to.getTime()) break;
+    // If we landed exactly at shift end, move to tomorrow
+    const newLocalMs  = cursor.getTime() + UTC8;
+    const newLocalDate = new Date(newLocalMs);
+    const newFracH = newLocalDate.getUTCHours() + newLocalDate.getUTCMinutes() / 60;
+    if (!schedule.crossesMidnight && newFracH >= schedule.endFrac) {
+      const tomorrowMidnight = new Date(newLocalMs);
+      tomorrowMidnight.setUTCHours(24, 0, 0, 0);
+      cursor = new Date(tomorrowMidnight.getTime() - UTC8);
+    }
   }
   return total;
 }
@@ -6527,11 +6593,18 @@ function scCalcRD(agentEmail, agentName, assignedTaskIds, year, mon) {
   scTaskLogData.forEach(l => {
     const localDate = new Date(l.LogDate).toLocaleDateString('en-CA');
     logMap[`${l.TaskID}_${localDate}`] = l;
-    // Also index by next day in case log was stored at UTC midnight (= prior local date)
+    // Also index by next day in case log was stored at UTC midnight (= prior local day)
     const nextDay = new Date(new Date(l.LogDate).getTime() + 86400000).toLocaleDateString('en-CA');
     if (!logMap[`${l.TaskID}_${nextDay}`]) {
       logMap[`${l.TaskID}_${nextDay}`] = l;
     }
+  });
+  // Debug: show all keys for Angeline's tasks
+  if (agentName === 'Angeline Santos') {
+    const agentKeys = Object.keys(logMap).filter(k => k.startsWith('169_') || k.startsWith('178_') || k.startsWith('424_'));
+    console.log('[RD] logMap keys for tasks 169,178,424:', agentKeys);
+    console.log('[RD] scTaskLogData count:', scTaskLogData.length, 'sample LogDates:', scTaskLogData.slice(0,3).map(l=>l.TaskID+'@'+l.LogDate+'='+l.Status));
+  }
   });
 
   // For each assigned task, check each day in the month
@@ -6548,6 +6621,8 @@ function scCalcRD(agentEmail, agentName, assignedTaskIds, year, mon) {
 
     if (task.Frequency === 'Daily') {
       let taskDays = 0;
+      let taskMisses = 0;
+      const missedDates = [];
       for (let d = 1; d <= lastDay; d++) {
         const dateObj = new Date(year, mon-1, d);
         if (dateObj > today) continue;
@@ -6558,9 +6633,9 @@ function scCalcRD(agentEmail, agentName, assignedTaskIds, year, mon) {
         taskDays++;
         const dateStr = dateObj.toLocaleDateString('en-CA');
         const log = logMap[`${taskId}_${dateStr}`];
-        if (!log || log.Status === 'Missed') misses++;
+        if (!log || log.Status === 'Missed') { misses++; taskMisses++; missedDates.push(dateStr); }
       }
-      console.log(`[RD]   task ${taskId} "${task.Title}" (Tab:${task.Tab}) AssignedTo:"${task.AssignedTo}" days:${taskDays}`);
+      console.log(`[RD]   task ${taskId} "${task.Title}" (Tab:${task.Tab}) AssignedTo:"${task.AssignedTo}" days:${taskDays} misses:${taskMisses}${missedDates.length?' missed:['+missedDates.join(',')+']':''}`);
 
     } else if (task.Frequency === 'Weekly') {
       // Group days into Mon–Fri weeks; count 1 miss per week if no completed log that week
