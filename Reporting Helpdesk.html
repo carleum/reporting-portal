@@ -6755,13 +6755,14 @@ function scPdScore(avgDays) {
 }
 
 function scFinalScore(kpis) {
-  const active = kpis.filter(k => k.score > 0);
-  if (!active.length) return { pct:0, rating:'—', badge:'sc-badge-below', label:'No Data' };
+  // Exclude waived KPIs from weighted average — they don't count for or against
+  const active = kpis.filter(k => !k.waived);
+  if (!active.length) return { pct:0, rating:'—', badge:'sc-badge-below', label:'No Data', hasWaiver: kpis.some(k=>k.waived) };
   const ws  = active.reduce((s,k) => s + k.score * k.weight, 0);
   const wm  = active.reduce((s,k) => s + 5 * k.weight, 0);
   const pct = ws / wm * 100;
-  const hasWaiver = kpis.some(k => k.score === 0);
-  // Cap rating at 4.00 if any KPI is waived
+  const hasWaiver = kpis.some(k => k.waived);
+  // Cap rating at 4.00 if any KPI is waived (ceiling only — doesn't lift a low score)
   const rawRat = ws / wm * 5;
   const rat = hasWaiver ? Math.min(rawRat, 4.00).toFixed(2) : rawRat.toFixed(2);
   const cappedPct = hasWaiver ? Math.min(pct, 80) : pct;
@@ -6839,12 +6840,12 @@ function renderScorecard(agentEmail, agentName, monthVal, year, mon, assignedTas
 
   // ── Final ──
   const kpis = [
-    { score: wRD  ? 0 : rdResult.score,                         weight: 0.2 },
-    { score: wRA  ? 0 : raScore,                                weight: 0.2 },
-    { score: wPD  ? 0 : pdKpi.score,                           weight: 0.2 },
-    { score: wPQ  ? 0 : (pqScore > 0 ? Math.round(pqScore):0), weight: 0.2 },
-    { score: wTAT ? 0 : tatKpi.score,                          weight: 0.1 },
-    { score: wTA  ? 0 : taKpi.score,                           weight: 0.1 },
+    { score: wRD  ? 0 : rdResult.score,                         weight: 0.2, waived: !!wRD  },
+    { score: wRA  ? 0 : raScore,                                weight: 0.2, waived: !!wRA  },
+    { score: wPD  ? 0 : pdKpi.score,                           weight: 0.2, waived: !!wPD  },
+    { score: wPQ  ? 0 : (pqScore > 0 ? Math.round(pqScore):0), weight: 0.2, waived: !!wPQ  },
+    { score: wTAT ? 0 : tatKpi.score,                          weight: 0.1, waived: !!wTAT },
+    { score: wTA  ? 0 : taKpi.score,                           weight: 0.1, waived: !!wTA  },
   ];
   const final = scFinalScore(kpis);
   const scoreColor = final.pct >= 90 ? '#7ED47E' : final.pct >= 70 ? '#89D1FF' : final.pct >= 50 ? '#FFB57A' : '#FF9999';
@@ -7565,12 +7566,12 @@ function rkCalcAgentScore(agentEmail, agentName, agentGroup, data) {
   const raScore = raHits === 0 ? 5 : raHits === 1 ? 3 : 1;
 
   const kpis = [
-    { score: rkIsWaived('RD')  ? 0 : rdScore,         weight: 0.2 },
-    { score: rkIsWaived('RA')  ? 0 : raScore,         weight: 0.2 },
-    { score: rkIsWaived('PD')  ? 0 : pdKpi.score,     weight: 0.2 },
-    { score: rkIsWaived('PQ')  ? 0 : pqScore,         weight: 0.2 },
-    { score: rkIsWaived('TAT') ? 0 : tatKpi.score,    weight: 0.1 },
-    { score: rkIsWaived('TA')  ? 0 : taKpi.score,     weight: 0.1 },
+    { score: rkIsWaived('RD')  ? 0 : rdScore,         weight: 0.2, waived: rkIsWaived('RD')  },
+    { score: rkIsWaived('RA')  ? 0 : raScore,         weight: 0.2, waived: rkIsWaived('RA')  },
+    { score: rkIsWaived('PD')  ? 0 : pdKpi.score,     weight: 0.2, waived: rkIsWaived('PD')  },
+    { score: rkIsWaived('PQ')  ? 0 : pqScore,         weight: 0.2, waived: rkIsWaived('PQ')  },
+    { score: rkIsWaived('TAT') ? 0 : tatKpi.score,    weight: 0.1, waived: rkIsWaived('TAT') },
+    { score: rkIsWaived('TA')  ? 0 : taKpi.score,     weight: 0.1, waived: rkIsWaived('TA')  },
   ];
   return scFinalScore(kpis);
 }
