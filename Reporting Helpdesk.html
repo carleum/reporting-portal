@@ -7543,54 +7543,18 @@ function rkCalcAgentScore(agentEmail, agentName, agentGroup, data) {
   // Project Quality — no per-agent ratings in bulk, score=0 (waived)
   const pqScore = 0;
 
-  // Report Deliverables — use same per-day logic as scCalcRD
+  // Report Deliverables — delegate to scCalcRD to keep logic in sync
   const assignedTaskIds = atTasks
     .filter(t => normalizeAgentName(t.AssignedTo) === normalizeAgentName(agentName))
     .map(t => t.Id);
 
-  // Build log lookup: taskId_date → log (same as scCalcRD)
-  const logMap = {};
-  taskLogs.forEach(l => {
-    const localDate = new Date(l.LogDate).toLocaleDateString('en-CA');
-    logMap[`${l.TaskID}_${localDate}`] = l;
-    const nextDay = new Date(new Date(l.LogDate).getTime() + 86400000).toLocaleDateString('en-CA');
-    if (!logMap[`${l.TaskID}_${nextDay}`]) logMap[`${l.TaskID}_${nextDay}`] = l;
-  });
+  // Temporarily swap scTaskLogData so scCalcRD uses the rankings dataset
+  const _savedLogs = scTaskLogData;
+  scTaskLogData = taskLogs;
+  const rdResult = scCalcRD(agentEmail, agentName, assignedTaskIds, year, mon);
+  scTaskLogData = _savedLogs;
 
-  const today = new Date(); today.setHours(0,0,0,0);
-  const lastDay = new Date(year, mon, 0).getDate();
-  let rdMisses = 0, rdTotal = 0;
-
-  assignedTaskIds.forEach(taskId => {
-    const task = atTasks.find(t => t.Id === taskId);
-    if (!task || task.Frequency !== 'Daily') return;
-    const assignedDate = task.AssignedDate
-      ? new Date(task.AssignedDate)
-      : (task.Created ? new Date(task.Created) : null);
-    if (assignedDate) assignedDate.setHours(0,0,0,0);
-    for (let d = 1; d <= lastDay; d++) {
-      const dateObj = new Date(year, mon-1, d);
-      if (dateObj > today) continue;
-      const dow = dateObj.getDay();
-      if (dow === 0 || dow === 6) continue;
-      if (assignedDate && dateObj < assignedDate) continue;
-      rdTotal++;
-      const dateStr = dateObj.toLocaleDateString('en-CA');
-      const log = logMap[`${taskId}_${dateStr}`];
-      if (!log) { rdMisses++; }
-      else if (log.Status === 'Missed') { rdMisses++; }
-    }
-  });
-
-  // Bonus: tasks covered by agent not assigned to them
-  const coveredOther = taskLogs.filter(l =>
-    l.CompletedByEmail === agentEmail &&
-    !assignedTaskIds.includes(l.TaskID) &&
-    ['Completed','Delayed','No Update'].includes(l.Status)
-  ).length;
-  const effectiveMisses = Math.max(0, rdMisses - coveredOther);
-  const rdScore = effectiveMisses === 0 ? 5 : effectiveMisses === 1 ? 4 :
-                  effectiveMisses === 2 ? 3 : effectiveMisses === 3 ? 2 : 1;
+  const rdScore = rdResult.score;
 
   // Report Accuracy — escalations
   const groupEsc = escalations.filter(e => {
