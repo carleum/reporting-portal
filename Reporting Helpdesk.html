@@ -739,6 +739,22 @@ td:has(.empty-state){text-align:center;}
   </div>
 </div>
 
+<!-- DUPLICATE TICKET WARNING -->
+<div class="confirm-overlay" id="dupOverlay">
+  <div class="confirm-box">
+    <h3>⚠ Possible Duplicate Ticket</h3>
+    <p>You already have a similar open ticket:<br><br>
+      <b id="dupTicketNum"></b> — <span id="dupTicketSubj" style="color:var(--accent2);"></span><br>
+      <span style="font-size:.78rem;color:var(--muted);">Status: <span id="dupTicketStatus"></span></span>
+    </p>
+    <p style="font-size:.82rem;margin-top:8px;">Please check if your concern is already covered by that ticket before submitting a new one.</p>
+    <div class="confirm-actions">
+      <button class="btn-secondary" onclick="document.getElementById('dupOverlay').classList.remove('open')">Cancel</button>
+      <button class="btn-primary" onclick="document.getElementById('dupOverlay').classList.remove('open');submitTicket(true)">Submit Anyway</button>
+    </div>
+  </div>
+</div>
+
 <!-- DASHBOARD PAGE -->
 <div class="page" id="page-dashboard">
   <div class="kpi-row" id="kpiRow">
@@ -2419,6 +2435,30 @@ async function getDigest() {
 // ══════════════════════════════════════════════
 //  SUBMIT TICKET
 // ══════════════════════════════════════════════
+// ── Duplicate ticket detection ──
+function findDuplicateTicket(email, subject, desc) {
+  if (!myTickets?.length) return null;
+  const ACTIVE = new Set(['Open','In Progress','Pending']);
+  const newWords = tokenize(subject + ' ' + desc);
+  for (const t of myTickets) {
+    if (t.RequestorEmail?.toLowerCase() !== email.toLowerCase()) continue;
+    if (!ACTIVE.has(t.Status)) continue;
+    const existWords = tokenize(t.Title + ' ' + (t.Description || ''));
+    const overlap = newWords.filter(w => existWords.has(w)).length;
+    const score   = overlap / Math.max(newWords.length, 1);
+    if (score >= 0.4) return t; // 40% word overlap = likely duplicate
+  }
+  return null;
+}
+
+function tokenize(text) {
+  const STOP = new Set(['the','a','an','is','in','on','at','to','of','and','or','for','with','this','that','i','my','your','please','hi','good','day','can','you','we','it','be','as','from','have','has','are','was','were','will','would','like','need','help']);
+  return new Set(
+    text.toLowerCase().replace(/[^a-z0-9\s]/g,'').split(/\s+/)
+      .filter(w => w.length > 2 && !STOP.has(w))
+  );
+}
+
 async function submitTicket(skipDetection = false) {
   const name     = document.getElementById('f-name').value.trim();
   const email    = document.getElementById('f-email').value.trim();
@@ -2432,6 +2472,19 @@ async function submitTicket(skipDetection = false) {
   if (!name || !email || !subject || !category || !priority || !desc) {
     showMsg('submitMsg', '⚠ Please fill in all required fields.', '#E9730C');
     return;
+  }
+
+  // ── Duplicate detection — check requestor's own open tickets ──
+  if (!skipDetection) {
+    const dup = findDuplicateTicket(email, subject, desc);
+    if (dup) {
+      // Show duplicate warning overlay
+      document.getElementById('dupTicketNum').textContent  = dup.TicketNumber || '#' + dup.Id;
+      document.getElementById('dupTicketSubj').textContent = dup.Title;
+      document.getElementById('dupTicketStatus').textContent = dup.Status;
+      document.getElementById('dupOverlay').classList.add('open');
+      return;
+    }
   }
 
   // Project detection — show confirm dialog unless already declined or skipped
