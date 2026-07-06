@@ -1649,6 +1649,7 @@ td:has(.empty-state){text-align:center;}
           <button id="ltTab-holiday"         class="lt-admin-tab"        onclick="ltLoadAdminTab('holiday')">📅 Holiday</button>
           <button id="ltTab-retracted"       class="lt-admin-tab"        onclick="ltLoadAdminTab('retracted')">↩ Retracted</button>
           <button id="ltTab-all"             class="lt-admin-tab"        onclick="ltLoadAdminTab('all')">All</button>
+          <button id="ltTab-manageHolidays"  class="lt-admin-tab"        onclick="ltShowManageHolidays()" style="border-color:rgba(137,209,255,0.4);color:#89D1FF;">🗓 PH Holidays</button>
         </div>
         <!-- Search + date filters -->
         <div class="tbl-filters" style="margin-bottom:8px;flex-wrap:wrap;gap:6px;">
@@ -1673,6 +1674,45 @@ td:has(.empty-state){text-align:center;}
           <button class="btn-secondary" style="padding:4px 10px;font-size:.72rem;" onclick="ltClearPlottedSelection()">Clear</button>
         </div>
         <div id="ltAllLeaves"><div style="color:var(--muted);font-size:.8rem;">Loading…</div></div>
+
+        <!-- PH Holidays Management Panel -->
+        <div id="ltHolidayPanel" style="display:none;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+            <select id="ltHolYear" style="background:rgba(0,0,0,0.25);border:1px solid rgba(27,144,255,0.3);color:var(--text);border-radius:6px;padding:5px 10px;font-size:.78rem;outline:none;">
+              <option>2025</option><option selected>2026</option><option>2027</option>
+            </select>
+            <button class="btn-primary" style="padding:5px 14px;font-size:.76rem;" onclick="ltRefreshHolidaysFromAPI()">🔄 Refresh Regular Holidays from API</button>
+            <button class="btn-secondary" style="padding:5px 14px;font-size:.76rem;" onclick="ltShowAddHoliday()">+ Add Special Holiday</button>
+            <button class="btn-secondary" style="padding:5px 14px;font-size:.76rem;margin-left:auto;" onclick="ltLoadHolidays()">↻ Reload</button>
+          </div>
+          <!-- Add holiday form (hidden by default) -->
+          <div id="ltAddHolidayForm" style="display:none;background:rgba(0,112,242,0.06);border:1px solid rgba(27,144,255,0.25);border-radius:8px;padding:12px;margin-bottom:12px;">
+            <div style="font-size:.76rem;font-weight:700;color:var(--accent2);margin-bottom:8px;">Add Special Non-Working Holiday</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
+              <div>
+                <div style="font-size:.66rem;color:var(--muted);margin-bottom:3px;">HOLIDAY NAME</div>
+                <input id="ltHolName" type="text" placeholder="e.g. EDSA Anniversary" style="width:100%;background:rgba(0,0,0,0.25);border:1px solid rgba(27,144,255,0.3);color:var(--text);border-radius:6px;padding:6px 9px;font-size:.78rem;outline:none;" />
+              </div>
+              <div>
+                <div style="font-size:.66rem;color:var(--muted);margin-bottom:3px;">DATE</div>
+                <input id="ltHolDate" type="date" style="width:100%;background:rgba(0,0,0,0.25);border:1px solid rgba(27,144,255,0.3);color:var(--text);border-radius:6px;padding:6px 9px;font-size:.78rem;outline:none;" />
+              </div>
+              <div>
+                <div style="font-size:.66rem;color:var(--muted);margin-bottom:3px;">TYPE</div>
+                <select id="ltHolType" style="width:100%;background:rgba(0,0,0,0.25);border:1px solid rgba(27,144,255,0.3);color:var(--text);border-radius:6px;padding:6px 9px;font-size:.78rem;outline:none;">
+                  <option value="Special Non-Working">Special Non-Working</option>
+                  <option value="Regular">Regular</option>
+                </select>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn-primary" style="padding:5px 16px;font-size:.76rem;" onclick="ltSaveAddHoliday()">Save Holiday</button>
+              <button class="btn-secondary" style="padding:5px 14px;font-size:.76rem;" onclick="document.getElementById('ltAddHolidayForm').style.display='none'">Cancel</button>
+            </div>
+          </div>
+          <div id="ltHolidayList"><div style="color:var(--muted);font-size:.8rem;">Loading holidays…</div></div>
+        </div>
+
       </div><!-- end ltAllRecordsBody -->
     </div>
   </div>
@@ -7982,6 +8022,7 @@ const LT_USD_SITE     = 'https://sap.sharepoint.com/sites/208984';
 const LT_USD_LIST     = 'USD Leave Tool';
 const LT_USD_API      = `${LT_USD_SITE}/_api/web/lists/getbytitle('${encodeURIComponent(LT_USD_LIST)}')/items`;
 const LT_RLS_API      = `${LT_USD_SITE}/_api/web/lists/getbytitle('UserRLS')/items`;
+const LT_HOLIDAYS_API = `${LT_USD_SITE}/_api/web/lists/getbytitle('Portal%20Holidays')/items`;
 const LT_ALLOC_API    = `${LT_USD_SITE}/_api/web/lists/getbytitle('USDLeaveAllocations')/items`;
 const LT_HR_URL       = 'https://sapit-home-prod-004.launchpad.cfapps.eu10.hana.ondemand.com/site#leaverequest-create';
 const LT_PORTAL_URL      = 'https://reporting-portal.cfapps.us10.hana.ondemand.com';
@@ -8819,6 +8860,10 @@ const LT_ADMIN_TABS = {
 
 async function ltLoadAdminTab(tab) {
   ltAdminActiveTab = tab;
+  // Hide holiday panel, show normal leave list
+  document.getElementById('ltHolidayPanel').style.display = 'none';
+  document.getElementById('ltAllLeaves').style.display    = '';
+  document.getElementById('ltTab-manageHolidays').classList.remove('active');
   // Update tab button styles
   Object.keys(LT_ADMIN_TABS).forEach(t => {
     const btn = document.getElementById('ltTab-'+t);
@@ -9136,6 +9181,181 @@ async function ltAdminReject(id, agentEmail, tlEmail) {
 // ══════════════════════════════════════════════
 let jnGoals        = [];   // current list (my or team)
 let jnAdminList    = [];   // Journal Admin List
+// ══════════════════════════════════════════════
+//  PH HOLIDAY MANAGEMENT
+// ══════════════════════════════════════════════
+let ltHolidayData = [];
+
+function ltShowManageHolidays() {
+  // Deactivate other tabs
+  Object.keys(LT_ADMIN_TABS).forEach(t => {
+    const btn = document.getElementById('ltTab-' + t);
+    if (btn) btn.classList.remove('active');
+  });
+  document.getElementById('ltTab-manageHolidays').classList.add('active');
+  // Hide leave list, show holiday panel
+  document.getElementById('ltAllLeaves').style.display    = 'none';
+  document.getElementById('ltHolidayPanel').style.display = '';
+  // Hide filters not relevant to holidays
+  const bar = document.getElementById('ltPlottedBulkBar');
+  if (bar) bar.style.display = 'none';
+  ltLoadHolidays();
+}
+
+async function ltLoadHolidays() {
+  const year = parseInt(document.getElementById('ltHolYear').value) || 2026;
+  document.getElementById('ltHolidayList').innerHTML = '<div style="color:var(--muted);font-size:.8rem;">Loading…</div>';
+  try {
+    const res  = await fetch(`${LT_HOLIDAYS_API}?$filter=Year eq ${year}&$orderby=HolidayDate asc&$top=100&$select=Id,Title,HolidayDate,HolidayType,Year,Source`, ltSpOpts());
+    const data = await res.json();
+    ltHolidayData = data.d?.results || [];
+    ltRenderHolidays();
+  } catch(e) {
+    document.getElementById('ltHolidayList').innerHTML = '<div style="color:#FF9999;font-size:.78rem;">Failed to load holidays.</div>';
+  }
+}
+
+function ltRenderHolidays() {
+  const el = document.getElementById('ltHolidayList');
+  if (!ltHolidayData.length) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:.8rem;padding:12px;">No holidays found for this year. Click "Refresh Regular Holidays from API" to populate.</div>';
+    return;
+  }
+  el.innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:.78rem;">
+      <thead>
+        <tr style="background:rgba(0,0,0,0.3);">
+          <th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600;">Date</th>
+          <th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600;">Holiday</th>
+          <th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600;">Type</th>
+          <th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600;">Source</th>
+          <th style="padding:8px 10px;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        ${ltHolidayData.map(h => {
+          const d    = new Date(h.HolidayDate);
+          const dateStr = d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+          const typeColor = h.HolidayType === 'Regular' ? '#7ED47E' : '#89D1FF';
+          return `<tr style="border-bottom:1px solid rgba(27,144,255,0.1);">
+            <td style="padding:8px 10px;color:var(--accent2);">${dateStr}</td>
+            <td style="padding:8px 10px;font-weight:600;">${h.Title}</td>
+            <td style="padding:8px 10px;"><span style="background:rgba(0,0,0,0.2);border-radius:4px;padding:2px 8px;font-size:.7rem;color:${typeColor};">${h.HolidayType||'—'}</span></td>
+            <td style="padding:8px 10px;color:var(--muted);font-size:.72rem;">${h.Source||'—'}</td>
+            <td style="padding:8px 10px;text-align:right;"><button class="btn-secondary" style="padding:2px 8px;font-size:.7rem;border-color:rgba(255,80,80,0.3);color:#FF9999;" onclick="ltDeleteHoliday(${h.Id})">✕</button></td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+}
+
+async function ltRefreshHolidaysFromAPI() {
+  const year = parseInt(document.getElementById('ltHolYear').value) || 2026;
+  const btn  = event.target;
+  btn.disabled = true;
+  btn.textContent = '⏳ Fetching…';
+  try {
+    // Fetch from Nager.Date API
+    const res  = await fetch(`https://date.nager.at/api/v3/publicholidays/${year}/PH`);
+    const list = await res.json();
+    if (!Array.isArray(list) || !list.length) {
+      showToast('⚠ No holidays returned from API', '#E9730C');
+      return;
+    }
+    // Get digest for SP writes
+    const dRes    = await fetch(`${LT_USD_SITE}/_api/contextinfo`, { method:'POST', ...ltSpOpts({'Content-Type':'application/json'}) });
+    const dData   = await dRes.json();
+    const digest  = dData.d.GetContextWebInformation.FormDigestValue;
+    // Load existing to avoid duplicates
+    const exRes   = await fetch(`${LT_HOLIDAYS_API}?$filter=Year eq ${year}&$select=Id,HolidayDate`, ltSpOpts());
+    const exData  = await exRes.json();
+    const existing = new Set((exData.d?.results||[]).map(h => h.HolidayDate?.split('T')[0]));
+    let added = 0, skipped = 0;
+    for (const h of list) {
+      if (existing.has(h.date)) { skipped++; continue; }
+      const payload = {
+        __metadata: { type: 'SP.Data.Portal_x0020_HolidaysListItem' },
+        Title:       h.name,
+        HolidayDate: h.date + 'T00:00:00Z',
+        HolidayType: 'Regular',
+        Year:        year,
+        Source:      'Nager.Date API'
+      };
+      await fetch(LT_HOLIDAYS_API, {
+        method: 'POST',
+        ...ltSpOpts({ 'Content-Type':'application/json;odata=verbose', 'X-RequestDigest': digest }),
+        body: JSON.stringify(payload)
+      });
+      added++;
+    }
+    showToast(`✅ Added ${added} holidays (${skipped} already existed)`, '#188918');
+    ltLoadHolidays();
+  } catch(e) {
+    console.error('[Holidays]', e);
+    showToast('⚠ Failed to refresh holidays', '#E9730C');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🔄 Refresh Regular Holidays from API';
+  }
+}
+
+function ltShowAddHoliday() {
+  const form = document.getElementById('ltAddHolidayForm');
+  form.style.display = '';
+  document.getElementById('ltHolName').value = '';
+  document.getElementById('ltHolDate').value = '';
+  document.getElementById('ltHolType').value = 'Special Non-Working';
+}
+
+async function ltSaveAddHoliday() {
+  const name = document.getElementById('ltHolName').value.trim();
+  const date = document.getElementById('ltHolDate').value;
+  const type = document.getElementById('ltHolType').value;
+  const year = parseInt(document.getElementById('ltHolYear').value) || 2026;
+  if (!name || !date) { showToast('⚠ Name and date are required', '#E9730C'); return; }
+  try {
+    const dRes   = await fetch(`${LT_USD_SITE}/_api/contextinfo`, { method:'POST', ...ltSpOpts({'Content-Type':'application/json'}) });
+    const dData  = await dRes.json();
+    const digest = dData.d.GetContextWebInformation.FormDigestValue;
+    const payload = {
+      __metadata: { type: 'SP.Data.Portal_x0020_HolidaysListItem' },
+      Title:       name,
+      HolidayDate: date + 'T00:00:00Z',
+      HolidayType: type,
+      Year:        year,
+      Source:      'Manual'
+    };
+    const res = await fetch(LT_HOLIDAYS_API, {
+      method: 'POST',
+      ...ltSpOpts({ 'Content-Type':'application/json;odata=verbose', 'X-RequestDigest': digest }),
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error(res.status);
+    document.getElementById('ltAddHolidayForm').style.display = 'none';
+    showToast('✅ Holiday added', '#188918');
+    ltLoadHolidays();
+  } catch(e) {
+    showToast('⚠ Failed to save holiday', '#E9730C');
+  }
+}
+
+async function ltDeleteHoliday(id) {
+  if (!confirm('Delete this holiday?')) return;
+  try {
+    const dRes   = await fetch(`${LT_USD_SITE}/_api/contextinfo`, { method:'POST', ...ltSpOpts({'Content-Type':'application/json'}) });
+    const dData  = await dRes.json();
+    const digest = dData.d.GetContextWebInformation.FormDigestValue;
+    await fetch(`${LT_HOLIDAYS_API}(${id})`, {
+      method: 'POST',
+      ...ltSpOpts({ 'X-RequestDigest': digest, 'X-HTTP-Method': 'DELETE', 'IF-MATCH': '*' })
+    });
+    showToast('✅ Holiday deleted', '#188918');
+    ltLoadHolidays();
+  } catch(e) {
+    showToast('⚠ Failed to delete holiday', '#E9730C');
+  }
+}
+
 let jnSelectedGoal = null; // currently open goal
 let jnActiveTab    = 'my'; // 'my' | 'team'
 let jnComments     = {};   // goalId → comments array
