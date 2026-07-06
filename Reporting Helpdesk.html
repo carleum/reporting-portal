@@ -5477,7 +5477,7 @@ function answerPortalQuery(raw) {
   // ── SCORECARD — TAT ──
   if (q.includes('tat') || (q.includes('ticket') && q.includes('score'))) {
     return `<b>Ticket TAT (10%)</b> is your average days to close tickets:<br><br>
-      • Under 3 days = 5<br>• 3–4 days = 4<br>• 4–5.5 days = 3<br>• 5.5–8 days = 2<br>• Over 8 days = 1`;
+      • Under 1 biz day = 5<br>• 1–2 biz days = 4<br>• 2–3 biz days = 3<br>• 3–5 biz days = 2<br>• Over 5 biz days = 1`;
   }
 
   // ── SCORECARD — WAIVER ──
@@ -6650,13 +6650,13 @@ function scCalcRD(agentEmail, agentName, assignedTaskIds, year, mon) {
   return { score: total > 0 ? score : 0, label, misses: effectiveMisses, total, covered: coveredOtherTaskDays };
 }
 
-function scTatScore(avgDays) {
-  if (avgDays === null) return { score:0, label:'No closed tickets' };
-  if (avgDays < 3)    return { score:5, label:`${avgDays.toFixed(1)}d avg` };
-  if (avgDays <= 4)   return { score:4, label:`${avgDays.toFixed(1)}d avg` };
-  if (avgDays <= 5.5) return { score:3, label:`${avgDays.toFixed(1)}d avg` };
-  if (avgDays <= 8)   return { score:2, label:`${avgDays.toFixed(1)}d avg` };
-  return                     { score:1, label:`${avgDays.toFixed(1)}d avg` };
+function scTatScore(avgBizDays) {
+  if (avgBizDays === null) return { score:0, label:'No closed tickets' };
+  if (avgBizDays < 1)     return { score:5, label:`${avgBizDays.toFixed(1)} biz days avg` };
+  if (avgBizDays <= 2)    return { score:4, label:`${avgBizDays.toFixed(1)} biz days avg` };
+  if (avgBizDays <= 3)    return { score:3, label:`${avgBizDays.toFixed(1)} biz days avg` };
+  if (avgBizDays <= 5)    return { score:2, label:`${avgBizDays.toFixed(1)} biz days avg` };
+  return                          { score:1, label:`${avgBizDays.toFixed(1)} biz days avg` };
 }
 
 function scTaScore(passed, total) {
@@ -6708,8 +6708,13 @@ function renderScorecard(agentEmail, agentName, monthVal, year, mon, assignedTas
 
   // ── TAT ──
   const closed = scTicketData.filter(t => SC_CLOSED.has(t.Status));
-  const tatDays = closed.map(t => Math.max(0,(new Date(t.Modified)-new Date(t.Created))/86400000));
-  const avgTat = tatDays.length ? tatDays.reduce((a,b)=>a+b,0)/tatDays.length : null;
+  const tatBizDays = closed.map(t => {
+    const schedule = getBizSchedule(t.Category);
+    const bizH = countBusinessHours(new Date(t.Created), new Date(t.Modified), schedule);
+    const dayH = schedule?.shiftHours || 9;
+    return Math.max(0, bizH / dayH);
+  });
+  const avgTat = tatBizDays.length ? tatBizDays.reduce((a,b)=>a+b,0)/tatBizDays.length : null;
   const tatKpi = scTatScore(avgTat);
 
   // ── Ticket Accuracy ──
@@ -7433,8 +7438,13 @@ function rkCalcAgentScore(agentEmail, agentName, agentGroup, data) {
   // TAT
   const myTickets = tickets.filter(t => t.AssignedTo === agentEmail);
   const closed = myTickets.filter(t => SC_CLOSED.has(t.Status));
-  const tatDays = closed.map(t => Math.max(0,(new Date(t.Modified)-new Date(t.Created))/86400000));
-  const avgTat = tatDays.length ? tatDays.reduce((a,b)=>a+b,0)/tatDays.length : null;
+  const tatBizDays = closed.map(t => {
+    const schedule = getBizSchedule(t.Category);
+    const bizH = countBusinessHours(new Date(t.Created), new Date(t.Modified), schedule);
+    const dayH = schedule?.shiftHours || 9;
+    return Math.max(0, bizH / dayH);
+  });
+  const avgTat = tatBizDays.length ? tatBizDays.reduce((a,b)=>a+b,0)/tatBizDays.length : null;
   const tatKpi = scTatScore(avgTat);
 
   // Ticket Accuracy
