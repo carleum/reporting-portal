@@ -3533,7 +3533,7 @@ async function selectTicket(id) {
   const t = adminTickets.find(x => x.Id === id);
   if (!t) return;
   selectedTicket = t;
-  renderQueue(adminTickets);
+  filterAdminQueue(); // re-apply current filter instead of rendering unfiltered list
   renderTicketDetail(t);
   // Load attachments async after panel renders
   loadAttachments(t.Id).then(attachments => {
@@ -4393,7 +4393,7 @@ async function selectProject(id) {
   const p = adminProjects.find(x => x.Id === id);
   if (!p) return;
   selectedTicket = p;
-  renderProjectQueue(adminProjects);
+  filterAdminQueue(); // re-apply current filter
   renderProjectDetail(p);
   // Load attachments async
   loadProjectAttachments(p.Id).then(attachments => {
