@@ -2229,6 +2229,34 @@ function addBusinessDays(start, days, schedule) {
   return addBusinessHours(start, days * hoursPerDay, schedule);
 }
 
+// Count business hours between two dates
+function countBusinessHours(from, to, schedule) {
+  if (!schedule) return (to - from) / 3600000;
+  if (to <= from) return -countBusinessHours(to, from, schedule);
+  const STEP_MS = 15 * 60000;
+  const STEP_H  = 0.25;
+  const UTC_OFFSET_MS = 8 * 3600000;
+  let cursor  = new Date(from.getTime());
+  let total   = 0;
+  let safety  = 0;
+  while (cursor < to && safety++ < 20000) {
+    const localMs   = cursor.getTime() + UTC_OFFSET_MS;
+    const localDate = new Date(localMs);
+    const dow  = localDate.getUTCDay();
+    const fracH = localDate.getUTCHours() + localDate.getUTCMinutes() / 60;
+    const inWorkDay = schedule.workDays.includes(dow);
+    let inShift;
+    if (schedule.crossesMidnight) {
+      inShift = fracH >= schedule.startFrac || fracH < schedule.endFrac;
+    } else {
+      inShift = fracH >= schedule.startFrac && fracH < schedule.endFrac;
+    }
+    if (inWorkDay && inShift) total += STEP_H;
+    cursor = new Date(cursor.getTime() + STEP_MS);
+  }
+  return total;
+}
+
 // ══════════════════════════════════════════════
 //  SLA HELPERS
 // ══════════════════════════════════════════════
@@ -2289,13 +2317,13 @@ function slaLabel(ticket) {
   const pausedMs  = slaPendedMs(ticket.Comments);
   const deadline  = slaDeadline(ticket.Created, ticket.Priority, ticket.Category);
   const now       = new Date();
-  const diffH     = (deadline - now + pausedMs) / 3600000;
   const schedule  = getBizSchedule(ticket.Category);
-  const dayHours  = schedule?.shiftHours || 8;
-  if (diffH < 0)         return `<span class="sla-breach">⚠ Breached</span>`;
-  if (diffH < 4)         return `<span class="sla-warn">⏱ ${Math.round(diffH)}h left</span>`;
-  const diffD = diffH / dayHours;
-  if (diffD < 1)         return `<span class="sla-warn">${Math.round(diffH)}h left</span>`;
+  const remainBizH = countBusinessHours(now, new Date(deadline.getTime() + pausedMs), schedule);
+  const dayHours   = schedule?.shiftHours || 9;
+  if (remainBizH < 0)      return `<span class="sla-breach">⚠ Breached</span>`;
+  if (remainBizH < 4)      return `<span class="sla-warn">⏱ ${Math.round(remainBizH)}h left</span>`;
+  const diffD = remainBizH / dayHours;
+  if (diffD < 1)           return `<span class="sla-warn">${Math.round(remainBizH)}h left</span>`;
   return `<span class="sla-ok">${diffD.toFixed(1)}d left</span>`;
   } catch(e) { console.error('[slaLabel]', e, ticket); return `<span class="sla-warn">—</span>`; }
 }
