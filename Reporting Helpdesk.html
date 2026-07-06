@@ -2369,7 +2369,7 @@ function lastPendedAt(comments) {
 
 function slaLabel(ticket) {
   try {
-  if (['Resolved','Closed'].includes(ticket.Status)) return `<span class="sla-ok">✓ Done</span>`;
+  if (['Resolved','Closed','Cancelled'].includes(ticket.Status)) return `<span class="sla-ok">✓ Done</span>`;
   if (ticket.Status === 'Pending') {
     const pendedAt = lastPendedAt(ticket.Comments);
     if (pendedAt) {
