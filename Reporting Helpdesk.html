@@ -6599,12 +6599,7 @@ function scCalcRD(agentEmail, agentName, assignedTaskIds, year, mon) {
       logMap[`${l.TaskID}_${nextDay}`] = l;
     }
   });
-  // Debug: show all keys for Angeline's tasks
-  if (agentName === 'Angeline Santos') {
-    const agentKeys = Object.keys(logMap).filter(k => k.startsWith('169_') || k.startsWith('178_') || k.startsWith('424_'));
-    console.log('[RD] logMap keys for tasks 169,178,424:', agentKeys);
-    console.log('[RD] scTaskLogData count:', scTaskLogData.length, 'sample LogDates:', scTaskLogData.slice(0,3).map(l=>l.TaskID+'@'+l.LogDate+'='+l.Status));
-  }
+
 
 
   // For each assigned task, check each day in the month
@@ -6621,11 +6616,9 @@ function scCalcRD(agentEmail, agentName, assignedTaskIds, year, mon) {
 
     if (task.Frequency === 'Daily') {
       let taskDays = 0;
-      let taskMisses = 0;
-      const missedDates = [];
       for (let d = 1; d <= lastDay; d++) {
         const dateObj = new Date(year, mon-1, d);
-        if (dateObj > today) continue;
+        if (dateObj >= today) continue; // only count fully completed days
         const dow = dateObj.getDay();
         if (dow === 0 || dow === 6) continue;
         if (assignedDate && dateObj < assignedDate) continue;
@@ -6633,9 +6626,9 @@ function scCalcRD(agentEmail, agentName, assignedTaskIds, year, mon) {
         taskDays++;
         const dateStr = dateObj.toLocaleDateString('en-CA');
         const log = logMap[`${taskId}_${dateStr}`];
-        if (!log || log.Status === 'Missed') { misses++; taskMisses++; missedDates.push(dateStr); }
+        if (!log || log.Status === 'Missed') misses++;
       }
-      console.log(`[RD]   task ${taskId} "${task.Title}" (Tab:${task.Tab}) AssignedTo:"${task.AssignedTo}" days:${taskDays} misses:${taskMisses}${missedDates.length?' missed:['+missedDates.join(',')+']':''}`);
+      console.log(`[RD]   task ${taskId} "${task.Title}" (Tab:${task.Tab}) AssignedTo:"${task.AssignedTo}" days:${taskDays}`);
 
     } else if (task.Frequency === 'Weekly') {
       // Group days into Mon–Fri weeks; count 1 miss per week if no completed log that week
