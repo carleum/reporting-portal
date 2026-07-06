@@ -2183,121 +2183,42 @@ function getBizSchedule(category) {
   return _bizSchedules[category] || null;
 }
 
-// Convert a UTC Date to fractional local hour in the schedule's timezone (PHT = UTC+8)
-function toLocalFracHour(date, tz) {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    hour: 'numeric', minute: 'numeric', hour12: false, timeZone: tz
-  }).formatToParts(date);
-  const h = parseInt(parts.find(p => p.type === 'hour')?.value || 0);
-  const m = parseInt(parts.find(p => p.type === 'minute')?.value || 0);
-  return h + m / 60;
-}
-
-function toLocalDayOfWeek(date, tz) {
-  return parseInt(new Intl.DateTimeFormat('en-US', {
-    weekday: 'short', timeZone: tz
-  }).formatToParts(date).find(p => p.type === 'weekday')
-    ? new Date(date.toLocaleString('en-US', { timeZone: tz })).getDay()
-    : date.getDay());
-}
-
-function isWorkDay(date, schedule) {
-  const dow = new Date(date.toLocaleString('en-US', { timeZone: schedule.timezone })).getDay();
-  return schedule.workDays.includes(dow);
-}
-
 // Add `hours` business hours to `start` date using the given schedule
+// Steps forward in 15-min increments, skipping non-work periods. Cap at 10000 steps.
 function addBusinessHours(start, hours, schedule) {
   if (!schedule) return new Date(start.getTime() + hours * 3600000);
 
-  let remaining = hours;
-  let cursor    = new Date(start.getTime());
-  const MS_MIN  = 60000;
-  const tz      = schedule.timezone;
+  const STEP_MS  = 15 * 60000; // 15-minute steps
+  const STEP_H   = 0.25;
+  const tz       = schedule.timezone;
+  let cursor     = new Date(start.getTime());
+  let remaining  = hours;
+  let safety     = 0;
 
-  // Advance cursor to next business moment if currently outside shift
-  cursor = advanceToShiftStart(cursor, schedule);
+  while (remaining > 0 && safety++ < 10000) {
+    const local  = new Date(cursor.toLocaleString('en-US', { timeZone: tz }));
+    const dow    = local.getDay();
+    const fracH  = local.getHours() + local.getMinutes() / 60;
 
-  while (remaining > 0) {
-    if (!isWorkDay(cursor, schedule)) {
-      // skip to next day shift start
-      cursor = nextDayShiftStart(cursor, schedule);
-      continue;
-    }
-    const localH = toLocalFracHour(cursor, tz);
-    let minutesLeftInShift;
+    const inWorkDay = schedule.workDays.includes(dow);
+    let inShift;
     if (schedule.crossesMidnight) {
-      // shift wraps midnight: start e.g. 21:00, end 06:00
-      if (localH >= schedule.startFrac || localH < schedule.endFrac) {
-        // inside shift
-        minutesLeftInShift = localH >= schedule.startFrac
-          ? (24 - localH + schedule.endFrac) * 60
-          : (schedule.endFrac - localH) * 60;
-      } else {
-        cursor = advanceToShiftStart(cursor, schedule);
-        continue;
-      }
+      inShift = fracH >= schedule.startFrac || fracH < schedule.endFrac;
     } else {
-      if (localH >= schedule.startFrac && localH < schedule.endFrac) {
-        minutesLeftInShift = (schedule.endFrac - localH) * 60;
-      } else {
-        cursor = advanceToShiftStart(cursor, schedule);
-        continue;
-      }
+      inShift = fracH >= schedule.startFrac && fracH < schedule.endFrac;
     }
-    const minutesNeeded = remaining * 60;
-    if (minutesNeeded <= minutesLeftInShift) {
-      cursor = new Date(cursor.getTime() + minutesNeeded * MS_MIN);
-      remaining = 0;
-    } else {
-      cursor    = new Date(cursor.getTime() + minutesLeftInShift * MS_MIN);
-      remaining -= minutesLeftInShift / 60;
-      cursor     = advanceToShiftStart(cursor, schedule);
+
+    if (inWorkDay && inShift) {
+      remaining -= STEP_H;
     }
+    cursor = new Date(cursor.getTime() + STEP_MS);
   }
   return cursor;
 }
 
-function advanceToShiftStart(date, schedule) {
-  const tz     = schedule.timezone;
-  const localH = toLocalFracHour(date, tz);
-  if (schedule.crossesMidnight) {
-    if (localH >= schedule.startFrac || localH < schedule.endFrac) return date; // already in shift
-  } else {
-    if (localH >= schedule.startFrac && localH < schedule.endFrac) return date;
-  }
-  // Move to next shift start on a workday
-  return nextShiftStart(date, schedule);
-}
-
-function nextShiftStart(date, schedule) {
-  const tz      = schedule.timezone;
-  const localStr = date.toLocaleString('en-US', { timeZone: tz });
-  const local    = new Date(localStr);
-  // Set to shift start today
-  local.setHours(Math.floor(schedule.startFrac), Math.round((schedule.startFrac % 1) * 60), 0, 0);
-  // Convert back to UTC offset
-  const todayStart = new Date(local.toLocaleString('en-US') + ' UTC');
-  const diff       = date.getTime() - new Date(date.toLocaleString('en-US', { timeZone: tz })).getTime();
-  let candidate    = new Date(local.getTime() - diff);
-  // If shift start today is in the past, move to next day
-  if (candidate <= date) candidate = new Date(candidate.getTime() + 86400000);
-  // Skip non-work days
-  let tries = 0;
-  while (!isWorkDay(candidate, schedule) && tries++ < 7) {
-    candidate = new Date(candidate.getTime() + 86400000);
-  }
-  return candidate;
-}
-
-function nextDayShiftStart(date, schedule) {
-  return nextShiftStart(new Date(date.getTime() + 86400000), schedule);
-}
-
-// Add `days` business days to `start`
 function addBusinessDays(start, days, schedule) {
   if (!schedule) return new Date(start.getTime() + days * 86400000);
-  const hoursPerDay = schedule.shiftHours || 8;
+  const hoursPerDay = schedule.shiftHours || 9;
   return addBusinessHours(start, days * hoursPerDay, schedule);
 }
 
@@ -2794,6 +2715,7 @@ async function loadDashboard() {
     updateKPIs();
     renderTicketTable(allTickets, 'ticketTableBody', true);
   } catch(e) {
+    console.error('[loadDashboard]', e);
     document.getElementById('ticketTableBody').innerHTML =
       `<tr><td colspan="10" style="color:#FF9999;padding:20px;">Failed to load tickets. Make sure you are signed in to SharePoint.</td></tr>`;
   }
