@@ -2176,6 +2176,10 @@ async function loadBizHours() {
     console.warn('[BizHours] Failed to load Portal Business Hours — using linear fallback', e);
     _bizSchedules = {};
   }
+  // Re-render tickets and projects now that schedules are loaded
+  if (allTickets?.length)  renderTicketTable(allTickets, 'ticketTableBody', true);
+  if (myTickets?.length)   renderTicketTable(myTickets, 'myTicketTableBody', false);
+  if (myProjects?.length)  renderProjectTable(myProjects, 'myProjectTableBody');
 }
 
 function getBizSchedule(category) {
