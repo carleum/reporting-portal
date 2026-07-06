@@ -6605,7 +6605,7 @@ function scCalcRD(agentEmail, agentName, assignedTaskIds, year, mon) {
     console.log('[RD] logMap keys for tasks 169,178,424:', agentKeys);
     console.log('[RD] scTaskLogData count:', scTaskLogData.length, 'sample LogDates:', scTaskLogData.slice(0,3).map(l=>l.TaskID+'@'+l.LogDate+'='+l.Status));
   }
-  });
+
 
   // For each assigned task, check each day in the month
   console.log(`[RD] ${agentName} — assignedTaskIds count: ${assignedTaskIds.length}`);
