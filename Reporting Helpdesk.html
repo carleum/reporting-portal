@@ -2185,20 +2185,23 @@ function getBizSchedule(category) {
 
 // Add `hours` business hours to `start` date using the given schedule
 // Steps forward in 15-min increments, skipping non-work periods. Cap at 10000 steps.
+// Uses UTC+8 offset directly (PHT) — avoids browser timezone name compatibility issues.
 function addBusinessHours(start, hours, schedule) {
   if (!schedule) return new Date(start.getTime() + hours * 3600000);
 
   const STEP_MS  = 15 * 60000; // 15-minute steps
   const STEP_H   = 0.25;
-  const tz       = schedule.timezone;
+  const UTC_OFFSET_MS = 8 * 3600000; // PHT = UTC+8
   let cursor     = new Date(start.getTime());
   let remaining  = hours;
   let safety     = 0;
 
   while (remaining > 0 && safety++ < 10000) {
-    const local  = new Date(cursor.toLocaleString('en-US', { timeZone: tz }));
-    const dow    = local.getDay();
-    const fracH  = local.getHours() + local.getMinutes() / 60;
+    // Get local PHT time via UTC+8 offset
+    const localMs  = cursor.getTime() + UTC_OFFSET_MS;
+    const localDate = new Date(localMs);
+    const dow   = localDate.getUTCDay();
+    const fracH = localDate.getUTCHours() + localDate.getUTCMinutes() / 60;
 
     const inWorkDay = schedule.workDays.includes(dow);
     let inShift;
@@ -2267,6 +2270,7 @@ function lastPendedAt(comments) {
 }
 
 function slaLabel(ticket) {
+  try {
   if (['Resolved','Closed'].includes(ticket.Status)) return `<span class="sla-ok">✓ Done</span>`;
   if (ticket.Status === 'Pending') {
     const pendedAt = lastPendedAt(ticket.Comments);
@@ -2289,6 +2293,7 @@ function slaLabel(ticket) {
   const diffD = diffH / dayHours;
   if (diffD < 1)         return `<span class="sla-warn">${Math.round(diffH)}h left</span>`;
   return `<span class="sla-ok">${diffD.toFixed(1)}d left</span>`;
+  } catch(e) { console.error('[slaLabel]', e, ticket); return `<span class="sla-warn">—</span>`; }
 }
 
 // ══════════════════════════════════════════════
@@ -2749,6 +2754,7 @@ async function loadMyTickets() {
     myTickets = tickets;
     renderTicketTable(myTickets, 'myTicketTableBody', false);
   } catch(e) {
+    console.error('[loadMyTickets]', e);
     document.getElementById('myTicketTableBody').innerHTML =
       `<tr><td colspan="9" style="color:#FF9999;padding:20px;">Failed to load. Make sure you are signed in to SharePoint.</td></tr>`;
   }
