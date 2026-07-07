@@ -8230,7 +8230,10 @@ function ltGetAvailableCredits() {
   const used = ltMyLeaves.filter(l => {
     const y = new Date(l.field_3 || l.RequestedDate || '').getFullYear();
     return y === currentYear && ['filed','approved','pending approval','pending final approval'].includes((l.field_5||l.STATUS||'').toLowerCase());
-  }).length;
+  }).reduce((sum, l) => {
+    const lt = (l.field_4 || '').toLowerCase();
+    return sum + (lt.includes('halfday') || lt.includes('half day') ? 0.5 : 1);
+  }, 0);
   const remaining = Math.max(0, Math.round((totalUsable - used) * 10) / 10);
   return { entitlement, carryForward, accruedToDate, totalUsable, used, remaining };
 }
@@ -8598,10 +8601,12 @@ async function ltSubmitLeave() {
   // Holiday dates don't consume credits
   const holidayDatesSet = new Set(ltHolidayData.map(h => h.HolidayDate ? new Date(h.HolidayDate).toLocaleDateString('en-CA') : '').filter(Boolean));
   const nonHolidayDates = ltSelectedDates.filter(d => !holidayDatesSet.has(d));
+  const isHalfday = leaveType.toLowerCase().includes('halfday') || leaveType.toLowerCase().includes('half day');
+  const creditCost = isHalfday ? nonHolidayDates.length * 0.5 : nonHolidayDates.length;
   if (leaveType !== 'Unpaid Leave') {
     const credits = ltGetAvailableCredits();
-    if (credits.remaining < nonHolidayDates.length) {
-      showNotif('ltSubmitMsg',`⚠ Insufficient credits. You have ${credits.remaining} remaining but selected ${nonHolidayDates.length} non-holiday date(s).`,'#E9730C');
+    if (credits.remaining < creditCost) {
+      showNotif('ltSubmitMsg',`⚠ Insufficient credits. You have ${credits.remaining} remaining but this request requires ${creditCost} credit(s).`,'#E9730C');
       return;
     }
   }
