@@ -1717,7 +1717,49 @@ td:has(.empty-state){text-align:center;}
 
       </div><!-- end ltAllRecordsBody -->
     </div>
-  </div>
+
+    <!-- Allocation Manager -->
+    <div class="lt-card" style="margin-top:12px;" id="ltAllocCard">
+      <div class="lt-card-title" style="cursor:pointer;" onclick="ltToggleAllocManager()">
+        <span class="dot" style="background:#FFB57A"></span>🗓 Slot Allocation Manager
+        <span id="ltAllocToggle" style="margin-left:8px;font-size:.76rem;background:rgba(255,181,122,0.15);border:1px solid rgba(255,181,122,0.3);border-radius:4px;padding:2px 8px;">▶ Show</span>
+      </div>
+      <div id="ltAllocBody" style="display:none;margin-top:12px;">
+        <div style="font-size:.74rem;color:var(--muted);margin-bottom:10px;">Click any date to set the slot limit for that day. Default slots are used if no override is set.</div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;">
+          <button class="btn-secondary" style="padding:3px 10px;font-size:.74rem;" onclick="ltAllocPrevMonth()">‹</button>
+          <span id="ltAllocMonthLabel" style="font-size:.82rem;font-weight:700;min-width:120px;text-align:center;"></span>
+          <button class="btn-secondary" style="padding:3px 10px;font-size:.74rem;" onclick="ltAllocNextMonth()">›</button>
+          <button class="btn-secondary" style="padding:3px 10px;font-size:.72rem;margin-left:auto;" onclick="ltRenderAllocGrid()">↻</button>
+        </div>
+        <div id="ltAllocGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;"></div>
+        <!-- Edit slot popup -->
+        <div id="ltAllocEditWrap" style="display:none;margin-top:12px;background:rgba(0,0,0,0.2);border:1px solid rgba(255,181,122,0.3);border-radius:8px;padding:12px;">
+          <div style="font-size:.76rem;font-weight:700;color:#FFB57A;margin-bottom:8px;">Set Slots — <span id="ltAllocEditDate"></span></div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:.74rem;color:var(--muted);min-width:32px;">USD</span>
+              <button class="btn-secondary" style="padding:2px 10px;font-size:.9rem;font-weight:700;" onclick="ltAllocAdj('USD',-1)">−</button>
+              <span id="ltAllocUSDVal" style="font-size:1rem;font-weight:700;min-width:24px;text-align:center;color:#89D1FF;"></span>
+              <button class="btn-secondary" style="padding:2px 10px;font-size:.9rem;font-weight:700;" onclick="ltAllocAdj('USD',1)">+</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:.74rem;color:var(--muted);min-width:32px;">APA</span>
+              <button class="btn-secondary" style="padding:2px 10px;font-size:.9rem;font-weight:700;" onclick="ltAllocAdj('APA',-1)">−</button>
+              <span id="ltAllocAPAVal" style="font-size:1rem;font-weight:700;min-width:24px;text-align:center;color:#89D1FF;"></span>
+              <button class="btn-secondary" style="padding:2px 10px;font-size:.9rem;font-weight:700;" onclick="ltAllocAdj('APA',1)">+</button>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn-primary" style="padding:5px 16px;font-size:.76rem;" onclick="ltAllocSave()">💾 Save</button>
+            <button class="btn-secondary" style="padding:5px 14px;font-size:.76rem;" onclick="document.getElementById('ltAllocEditWrap').style.display='none'">Cancel</button>
+            <button class="btn-secondary" style="padding:5px 14px;font-size:.76rem;border-color:rgba(255,80,80,0.3);color:#FF9999;margin-left:auto;" onclick="ltAllocReset()">Reset to Default</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end ltAdminPanel -->
 
 </div>
 
@@ -9223,6 +9265,193 @@ async function ltAdminReject(id, agentEmail, tlEmail) {
 // ══════════════════════════════════════════════
 let jnGoals        = [];   // current list (my or team)
 let jnAdminList    = [];   // Journal Admin List
+// ══════════════════════════════════════════════
+//  SLOT ALLOCATION MANAGER
+// ══════════════════════════════════════════════
+let ltAllocYear  = new Date().getFullYear();
+let ltAllocMonth = new Date().getMonth();
+let ltAllocEditDateStr = null;
+let ltAllocEditUSD = 0;
+let ltAllocEditAPA = 0;
+
+function ltToggleAllocManager() {
+  const body   = document.getElementById('ltAllocBody');
+  const toggle = document.getElementById('ltAllocToggle');
+  const hidden = body.style.display === 'none';
+  body.style.display   = hidden ? '' : 'none';
+  toggle.textContent   = hidden ? '▼ Hide' : '▶ Show';
+  if (hidden) ltRenderAllocGrid();
+}
+
+function ltAllocPrevMonth() {
+  ltAllocMonth--;
+  if (ltAllocMonth < 0) { ltAllocMonth = 11; ltAllocYear--; }
+  ltRenderAllocGrid();
+}
+function ltAllocNextMonth() {
+  ltAllocMonth++;
+  if (ltAllocMonth > 11) { ltAllocMonth = 0; ltAllocYear++; }
+  ltRenderAllocGrid();
+}
+
+async function ltRenderAllocGrid() {
+  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const DAYS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  document.getElementById('ltAllocMonthLabel').textContent = `${MONTHS[ltAllocMonth]} ${ltAllocYear}`;
+  document.getElementById('ltAllocEditWrap').style.display = 'none';
+
+  // Load allocations for this month
+  const y = ltAllocYear, m = String(ltAllocMonth+1).padStart(2,'0');
+  const last = new Date(y, ltAllocMonth+1, 0).getDate();
+  let monthAllocs = {};
+  try {
+    const res = await fetch(
+      `${LT_ALLOC_API}?$filter=Date ge datetime'${y}-${m}-01T00:00:00' and Date le datetime'${y}-${m}-${String(last).padStart(2,'0')}T23:59:59'&$top=200&$select=Id,Date,MaxSlots,Team`,
+      ltSpOpts()
+    );
+    const d = await res.json();
+    (d.d?.results||[]).forEach(a => {
+      const key = new Date(a.Date).toLocaleDateString('en-CA');
+      if (!monthAllocs[key]) monthAllocs[key] = {};
+      monthAllocs[key][a.Team] = { id: a.Id, maxSlots: a.MaxSlots };
+    });
+  } catch(e) {}
+
+  const grid = document.getElementById('ltAllocGrid');
+  grid.innerHTML = '';
+  // Day headers
+  DAYS.forEach(d => {
+    const h = document.createElement('div');
+    h.style.cssText = 'text-align:center;font-size:.64rem;color:var(--muted);font-weight:700;padding:4px 0;';
+    h.textContent = d;
+    grid.appendChild(h);
+  });
+  // Blank fillers
+  const firstDow = new Date(y, ltAllocMonth, 1).getDay();
+  for (let i = 0; i < firstDow; i++) {
+    grid.appendChild(document.createElement('div'));
+  }
+  // Days
+  for (let d = 1; d <= last; d++) {
+    const dateObj = new Date(y, ltAllocMonth, d);
+    const dateStr = dateObj.toLocaleDateString('en-CA');
+    const dow     = dateObj.getDay();
+    const isWknd  = dow === 0 || dow === 6;
+    const usdDef  = LT_SLOTS_GY[dow];
+    const apaDef  = LT_SLOTS_APA[dow];
+    const usdSlots = monthAllocs[dateStr]?.USD?.maxSlots ?? usdDef;
+    const apaSlots = monthAllocs[dateStr]?.APA?.maxSlots ?? apaDef;
+    const hasOverride = !!monthAllocs[dateStr];
+
+    const cell = document.createElement('div');
+    cell.style.cssText = `background:rgba(0,0,0,0.2);border:1px solid ${hasOverride?'rgba(255,181,122,0.4)':'rgba(27,144,255,0.12)'};border-radius:5px;padding:4px;cursor:${isWknd?'default':'pointer'};min-height:54px;`;
+    if (!isWknd) cell.onclick = () => ltAllocEditDay(dateStr, usdSlots, apaSlots);
+    cell.innerHTML = `
+      <div style="font-size:.66rem;font-weight:700;color:${isWknd?'var(--muted)':'var(--text)'};">${d}</div>
+      ${isWknd ? '' : `
+        <div style="font-size:.6rem;color:#89D1FF;">USD: ${usdSlots}${hasOverride&&monthAllocs[dateStr]?.USD?'*':''}</div>
+        <div style="font-size:.6rem;color:#7ED47E;">APA: ${apaSlots}${hasOverride&&monthAllocs[dateStr]?.APA?'*':''}</div>
+      `}`;
+    grid.appendChild(cell);
+  }
+}
+
+function ltAllocEditDay(dateStr, usd, apa) {
+  ltAllocEditDateStr = dateStr;
+  ltAllocEditUSD = usd;
+  ltAllocEditAPA = apa;
+  const wrap = document.getElementById('ltAllocEditWrap');
+  document.getElementById('ltAllocEditDate').textContent = new Date(dateStr+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+  document.getElementById('ltAllocUSDVal').textContent = ltAllocEditUSD;
+  document.getElementById('ltAllocAPAVal').textContent = ltAllocEditAPA;
+  wrap.style.display = '';
+  wrap.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+function ltAllocAdj(team, delta) {
+  if (team === 'USD') {
+    ltAllocEditUSD = Math.max(0, ltAllocEditUSD + delta);
+    document.getElementById('ltAllocUSDVal').textContent = ltAllocEditUSD;
+  } else {
+    ltAllocEditAPA = Math.max(0, ltAllocEditAPA + delta);
+    document.getElementById('ltAllocAPAVal').textContent = ltAllocEditAPA;
+  }
+}
+
+async function ltAllocSave() {
+  if (!ltAllocEditDateStr) return;
+  const btn = document.querySelector('#ltAllocEditWrap .btn-primary');
+  btn.disabled = true; btn.textContent = '💾 Saving…';
+  try {
+    const dRes   = await fetch(`${LT_USD_SITE}/_api/contextinfo`, { method:'POST', ...ltSpOpts({'Content-Type':'application/json'}) });
+    const dData  = await dRes.json();
+    const digest = dData.d.GetContextWebInformation.FormDigestValue;
+    // Load existing allocations for this date to get IDs
+    const exRes  = await fetch(`${LT_ALLOC_API}?$filter=Date eq datetime'${ltAllocEditDateStr}T00:00:00'&$select=Id,Team`, ltSpOpts());
+    const exData = await exRes.json();
+    const existing = {};
+    (exData.d?.results||[]).forEach(a => { existing[a.Team] = a.Id; });
+    // Save USD and APA
+    for (const [team, val] of [['USD', ltAllocEditUSD], ['APA', ltAllocEditAPA]]) {
+      const payload = {
+        __metadata: { type: 'SP.Data.USDLeaveAllocationsListItem' },
+        Title:    `${ltAllocEditDateStr} - ${team}`,
+        Date:     ltAllocEditDateStr + 'T00:00:00Z',
+        MaxSlots: val,
+        Team:     team
+      };
+      if (existing[team]) {
+        // Update
+        await fetch(`${LT_ALLOC_API}(${existing[team]})`, {
+          method:'POST',
+          ...ltSpOpts({ 'Content-Type':'application/json;odata=verbose', 'X-RequestDigest':digest, 'X-HTTP-Method':'MERGE', 'IF-MATCH':'*' }),
+          body: JSON.stringify(payload)
+        });
+      } else {
+        // Create
+        await fetch(LT_ALLOC_API, {
+          method:'POST',
+          ...ltSpOpts({ 'Content-Type':'application/json;odata=verbose', 'X-RequestDigest':digest }),
+          body: JSON.stringify(payload)
+        });
+      }
+    }
+    showToast('✅ Slots updated', '#188918');
+    document.getElementById('ltAllocEditWrap').style.display = 'none';
+    await ltLoadAllocations(); // refresh main calendar allocs
+    ltRenderCalendar();
+    ltRenderAllocGrid();
+  } catch(e) {
+    showToast('⚠ Failed to save slots', '#E9730C');
+  } finally {
+    btn.disabled = false; btn.textContent = '💾 Save';
+  }
+}
+
+async function ltAllocReset() {
+  if (!ltAllocEditDateStr || !confirm(`Reset ${ltAllocEditDateStr} to default slots?`)) return;
+  try {
+    const dRes   = await fetch(`${LT_USD_SITE}/_api/contextinfo`, { method:'POST', ...ltSpOpts({'Content-Type':'application/json'}) });
+    const dData  = await dRes.json();
+    const digest = dData.d.GetContextWebInformation.FormDigestValue;
+    const exRes  = await fetch(`${LT_ALLOC_API}?$filter=Date eq datetime'${ltAllocEditDateStr}T00:00:00'&$select=Id`, ltSpOpts());
+    const exData = await exRes.json();
+    for (const a of (exData.d?.results||[])) {
+      await fetch(`${LT_ALLOC_API}(${a.Id})`, {
+        method:'POST',
+        ...ltSpOpts({ 'X-RequestDigest':digest, 'X-HTTP-Method':'DELETE', 'IF-MATCH':'*' })
+      });
+    }
+    showToast('✅ Reset to default', '#188918');
+    document.getElementById('ltAllocEditWrap').style.display = 'none';
+    await ltLoadAllocations();
+    ltRenderCalendar();
+    ltRenderAllocGrid();
+  } catch(e) {
+    showToast('⚠ Failed to reset', '#E9730C');
+  }
+}
+
 async function ltLoadHolidaysForCalendar() {
   try {
     const year = ltYear || new Date().getFullYear();
