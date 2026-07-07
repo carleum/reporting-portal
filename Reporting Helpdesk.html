@@ -9387,7 +9387,7 @@ async function ltAllocSave() {
     const dData  = await dRes.json();
     const digest = dData.d.GetContextWebInformation.FormDigestValue;
     // Load existing allocations for this date to get IDs
-    const exRes  = await fetch(`${LT_ALLOC_API}?$filter=Date eq datetime'${ltAllocEditDateStr}T00:00:00'&$select=Id,Team`, ltSpOpts());
+    const exRes  = await fetch(`${LT_ALLOC_API}?$filter=Date ge datetime'${ltAllocEditDateStr}T00:00:00' and Date le datetime'${ltAllocEditDateStr}T23:59:59'&$select=Id,Team`, ltSpOpts());
     const exData = await exRes.json();
     const existing = {};
     (exData.d?.results||[]).forEach(a => { existing[a.Team] = a.Id; });
@@ -9396,24 +9396,26 @@ async function ltAllocSave() {
       const payload = {
         __metadata: { type: 'SP.Data.USDLeaveAllocationsListItem' },
         Title:    `${ltAllocEditDateStr} - ${team}`,
-        Date:     ltAllocEditDateStr + 'T00:00:00Z',
+        Date:     ltAllocEditDateStr + 'T00:00:00',
         MaxSlots: val,
         Team:     team
       };
       if (existing[team]) {
         // Update
-        await fetch(`${LT_ALLOC_API}(${existing[team]})`, {
+        const r = await fetch(`${LT_ALLOC_API}(${existing[team]})`, {
           method:'POST',
           ...ltSpOpts({ 'Content-Type':'application/json;odata=verbose', 'X-RequestDigest':digest, 'X-HTTP-Method':'MERGE', 'IF-MATCH':'*' }),
           body: JSON.stringify(payload)
         });
+        if (!r.ok) { const t = await r.text(); console.error('[Alloc MERGE]', r.status, t); throw new Error(r.status); }
       } else {
         // Create
-        await fetch(LT_ALLOC_API, {
+        const r = await fetch(LT_ALLOC_API, {
           method:'POST',
           ...ltSpOpts({ 'Content-Type':'application/json;odata=verbose', 'X-RequestDigest':digest }),
           body: JSON.stringify(payload)
         });
+        if (!r.ok) { const t = await r.text(); console.error('[Alloc POST]', r.status, t); throw new Error(r.status); }
       }
     }
     showToast('✅ Slots updated', '#188918');
@@ -9434,7 +9436,7 @@ async function ltAllocReset() {
     const dRes   = await fetch(`${LT_USD_SITE}/_api/contextinfo`, { method:'POST', ...ltSpOpts({'Content-Type':'application/json'}) });
     const dData  = await dRes.json();
     const digest = dData.d.GetContextWebInformation.FormDigestValue;
-    const exRes  = await fetch(`${LT_ALLOC_API}?$filter=Date eq datetime'${ltAllocEditDateStr}T00:00:00'&$select=Id`, ltSpOpts());
+    const exRes  = await fetch(`${LT_ALLOC_API}?$filter=Date ge datetime'${ltAllocEditDateStr}T00:00:00' and Date le datetime'${ltAllocEditDateStr}T23:59:59'&$select=Id`, ltSpOpts());
     const exData = await exRes.json();
     for (const a of (exData.d?.results||[])) {
       await fetch(`${LT_ALLOC_API}(${a.Id})`, {
