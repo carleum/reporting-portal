@@ -8433,7 +8433,7 @@ function ltRenderCalendar() {
     const status = (l.field_5 || '').toLowerCase();
     if (!['filed','approved'].includes(status)) return;
     if (l.field_18 === currentUser.email) return; // skip own leaves (shown separately)
-    const firstName = (l.field_1 || l.field_18 || '').split(' ')[0].split('@')[0];
+    const firstName = (l.field_1 || l.field_18 || '').trim().split('@')[0];
     if (!approvedByDate[d]) approvedByDate[d] = [];
     if (!approvedByDate[d].includes(firstName)) approvedByDate[d].push(firstName);
   });
@@ -8492,7 +8492,7 @@ function ltRenderCalendar() {
     const holidayHtml  = holidayName ? `<div class="lt-holiday-badge">🎌 ${holidayName}</div>` : '';
     const agentNames   = approvedByDate[dateStr] || [];
     const agentsHtml   = agentNames.length
-      ? `<div style="margin-top:2px;">${agentNames.map(n => `<div style="font-size:.58rem;color:#89D1FF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">👤 ${n}</div>`).join('')}</div>`
+      ? `<div style="margin-top:2px;">${agentNames.map(n => `<div style="font-size:.58rem;color:#89D1FF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;" title="${n}">👤 ${n}</div>`).join('')}</div>`
       : '';
     const lockTitle    = isLocked ? vlBlock : (holidayName ? `PH Holiday: ${holidayName} — Slots still apply, no credits consumed` : '');
 
