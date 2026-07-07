@@ -477,6 +477,8 @@ td:has(.empty-state){text-align:center;}
 .lt-day.full{background:rgba(187,0,0,0.08);border-color:rgba(187,0,0,0.25);}
 .lt-day.has-mine{border-color:rgba(24,137,24,0.5);background:rgba(24,137,24,0.08);}
 .lt-day.blocked{opacity:.5;cursor:not-allowed;background:rgba(0,0,0,0.25);}
+.lt-day.is-holiday{border-color:rgba(255,181,122,0.5);background:rgba(255,181,122,0.06);}
+.lt-holiday-badge{font-size:.58rem;color:#FFB57A;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
 .lt-day-num{font-size:.7rem;font-weight:700;color:var(--muted);margin-bottom:2px;}
 .lt-day.today .lt-day-num{color:var(--accent);}
 .lt-slot-info{font-size:.6rem;color:var(--muted);}
@@ -1681,7 +1683,7 @@ td:has(.empty-state){text-align:center;}
             <select id="ltHolYear" style="background:rgba(0,0,0,0.25);border:1px solid rgba(27,144,255,0.3);color:var(--text);border-radius:6px;padding:5px 10px;font-size:.78rem;outline:none;">
               <option>2025</option><option selected>2026</option><option>2027</option>
             </select>
-            <button class="btn-primary" style="padding:5px 14px;font-size:.76rem;" onclick="ltRefreshHolidaysFromAPI()">🔄 Refresh Regular Holidays from API</button>
+            <button class="btn-primary" style="padding:5px 14px;font-size:.76rem;" onclick="ltRefreshHolidaysFromAPI()">🔄 Refresh Regular Holidays</button>
             <button class="btn-secondary" style="padding:5px 14px;font-size:.76rem;" onclick="ltShowAddHoliday()">+ Add Special Holiday</button>
             <button class="btn-secondary" style="padding:5px 14px;font-size:.76rem;margin-left:auto;" onclick="ltLoadHolidays()">↻ Reload</button>
           </div>
@@ -8115,6 +8117,7 @@ async function initLeaveTool() {
   await ltLoadAllocations();
   await ltLoadVLSchedule();
   await ltLoadMyLeaves();
+  await ltLoadHolidaysForCalendar(); // load PH holidays for calendar display
   ltRenderCalendar();
   ltRenderCredits();
   // Load TL approvals — panel auto-shows if pending leaves exist for this TL
@@ -8385,7 +8388,11 @@ function ltToggleMyLeaves() {
 // ── Calendar ──
 function ltPrevMonth() { ltMonth--; if(ltMonth<0){ltMonth=11;ltYear--;} ltRefresh(); }
 function ltNextMonth() { ltMonth++; if(ltMonth>11){ltMonth=0;ltYear++;} ltRefresh(); }
-async function ltRefresh() { await ltLoadAllocations(); await ltLoadMyLeaves(); }
+async function ltRefresh() {
+  await ltLoadAllocations();
+  await ltLoadMyLeaves();
+  await ltLoadHolidaysForCalendar();
+}
 
 function ltRenderCalendar() {
   const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -8406,6 +8413,13 @@ function ltRenderCalendar() {
     if (!d) return;
     if (['Filed','Approved'].includes(l.field_5||'')) myFiledDates[d] = l;
     else if (['Pending Approval','Pending Final Approval'].includes(l.field_5||'')) myPendingDates[d] = l;
+  });
+
+  // Holiday dates for this month
+  const holidayMap = {}; // dateStr → holiday name
+  ltHolidayData.forEach(h => {
+    const d = h.HolidayDate ? new Date(h.HolidayDate).toLocaleDateString('en-CA') : '';
+    if (d) holidayMap[d] = h.Title;
   });
 
   // Prev month fillers
@@ -8432,16 +8446,18 @@ function ltRenderCalendar() {
     const isFull  = userTeamFull === 'APA' ? usedAPA >= maxAPA : usedUSD >= maxUSD;
     const hasMine = !!myFiledDates[dateStr];
     const hasPending = !!myPendingDates[dateStr];
+    const holidayName = holidayMap[dateStr] || null;
 
     // 3-day blocking: dates before today+3 not blocked but warn
     const daysAhead = Math.floor((dateObj - today) / 86400000);
 
     let cls = 'lt-day';
-    if (isToday)   cls += ' today';
-    if (isWeekend) cls += ' weekend';
+    if (isToday)     cls += ' today';
+    if (isWeekend)   cls += ' weekend';
+    if (holidayName) cls += ' is-holiday';
     if (isFull && !hasMine) cls += ' full';
-    if (hasMine)   cls += ' has-mine';
-    if (isPast)    cls += ' blocked';
+    if (hasMine)     cls += ' has-mine';
+    if (isPast)      cls += ' blocked';
 
     // VL Calendar check for visual indicator (applies to all days including weekends)
     const vlBlock  = !isPast ? ltCheckVLCalendar(dateStr) : null;
@@ -8455,15 +8471,16 @@ function ltRenderCalendar() {
       ? `<div class="lt-slot-info" style="color:#AAAAAA;font-size:.58rem;">🔒 Locked</div>`
       : `<div class="lt-slot-info ${usdLeft <= 0 ? 'full' : 'avail'}">USD: ${usdLeft <= 0 ? 'Full' : usdLeft+' left'}</div>
          <div class="lt-slot-info ${apaLeft <= 0 ? 'full' : 'avail'}">APA: ${apaLeft <= 0 ? 'Full' : apaLeft+' left'}</div>`;
-    const myLeaveHtml = hasMine ? `<div class="lt-my-leave">${h((myFiledDates[dateStr].field_4||'').substring(0,10))}</div>` : '';
-    const pendingHtml = hasPending ? `<div class="lt-pending-leave">⏳</div>` : '';
-    const lockTitle   = isLocked ? vlBlock : '';
+    const myLeaveHtml  = hasMine    ? `<div class="lt-my-leave">${h((myFiledDates[dateStr].field_4||'').substring(0,10))}</div>` : '';
+    const pendingHtml  = hasPending ? `<div class="lt-pending-leave">⏳</div>` : '';
+    const holidayHtml  = holidayName ? `<div class="lt-holiday-badge">🎌 ${holidayName}</div>` : '';
+    const lockTitle    = isLocked ? vlBlock : (holidayName ? `PH Holiday: ${holidayName} — Slots still apply, no credits consumed` : '');
 
     const cell = document.createElement('div');
     cell.className = cls;
     cell.dataset.date = dateStr;
     if (lockTitle) cell.title = lockTitle;
-    cell.innerHTML = `<div class="lt-day-num">${d}</div>${slotText}${myLeaveHtml}${pendingHtml}`;
+    cell.innerHTML = `<div class="lt-day-num">${d}</div>${slotText}${holidayHtml}${myLeaveHtml}${pendingHtml}`;
     if (!isPast && !isWeekend && !isLocked) cell.onclick = () => ltDayClick(dateStr);
     grid.appendChild(cell);
   }
@@ -8561,10 +8578,13 @@ async function ltSubmitLeave() {
   }
 
   // Check credits for non-unpaid leaves
+  // Holiday dates don't consume credits
+  const holidayDatesSet = new Set(ltHolidayData.map(h => h.HolidayDate ? new Date(h.HolidayDate).toLocaleDateString('en-CA') : '').filter(Boolean));
+  const nonHolidayDates = ltSelectedDates.filter(d => !holidayDatesSet.has(d));
   if (leaveType !== 'Unpaid Leave') {
     const credits = ltGetAvailableCredits();
-    if (credits.remaining < ltSelectedDates.length) {
-      showNotif('ltSubmitMsg',`⚠ Insufficient credits. You have ${credits.remaining} remaining but selected ${ltSelectedDates.length} date(s).`,'#E9730C');
+    if (credits.remaining < nonHolidayDates.length) {
+      showNotif('ltSubmitMsg',`⚠ Insufficient credits. You have ${credits.remaining} remaining but selected ${nonHolidayDates.length} non-holiday date(s).`,'#E9730C');
       return;
     }
   }
@@ -9181,6 +9201,17 @@ async function ltAdminReject(id, agentEmail, tlEmail) {
 // ══════════════════════════════════════════════
 let jnGoals        = [];   // current list (my or team)
 let jnAdminList    = [];   // Journal Admin List
+async function ltLoadHolidaysForCalendar() {
+  try {
+    const year = ltYear || new Date().getFullYear();
+    const res  = await fetch(`${LT_HOLIDAYS_API}?$filter=Year eq ${year}&$top=100&$select=Id,Title,HolidayDate,HolidayType,Year`, ltSpOpts());
+    const data = await res.json();
+    ltHolidayData = data.d?.results || [];
+  } catch(e) {
+    ltHolidayData = [];
+  }
+}
+
 // ══════════════════════════════════════════════
 //  PH HOLIDAY MANAGEMENT
 // ══════════════════════════════════════════════
@@ -9228,7 +9259,6 @@ function ltRenderHolidays() {
           <th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600;">Date</th>
           <th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600;">Holiday</th>
           <th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600;">Type</th>
-          <th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600;">Source</th>
           <th style="padding:8px 10px;"></th>
         </tr>
       </thead>
@@ -9241,7 +9271,6 @@ function ltRenderHolidays() {
             <td style="padding:8px 10px;color:var(--accent2);">${dateStr}</td>
             <td style="padding:8px 10px;font-weight:600;">${h.Title}</td>
             <td style="padding:8px 10px;"><span style="background:rgba(0,0,0,0.2);border-radius:4px;padding:2px 8px;font-size:.7rem;color:${typeColor};">${h.HolidayType||'—'}</span></td>
-            <td style="padding:8px 10px;color:var(--muted);font-size:.72rem;">${h.Source||'—'}</td>
             <td style="padding:8px 10px;text-align:right;"><button class="btn-secondary" style="padding:2px 8px;font-size:.7rem;border-color:rgba(255,80,80,0.3);color:#FF9999;" onclick="ltDeleteHoliday(${h.Id})">✕</button></td>
           </tr>`;
         }).join('')}
